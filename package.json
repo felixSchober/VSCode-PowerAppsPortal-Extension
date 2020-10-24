@@ -7,19 +7,128 @@
 		"vscode": "^1.50.0"
 	},
 	"categories": [
-		"Other"
+		"SCM Providers"
 	],
 	"activationEvents": [
-		"onCommand:powerapps-portal-local-development.helloWorld"
+		"onCommand:powerapps-portal-local-development.configureExtension"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "powerapps-portal-local-development.helloWorld",
-				"title": "Hello World"
+				"command": "powerapps-portal-local-development.source-control.commit",
+				"title": "Commit local changes to JS Fiddle",
+				"icon": {
+					"light": "resources/icons/light/check.svg",
+					"dark": "resources/icons/dark/check.svg"
+				}
+			},
+			{
+				"command": "powerapps-portal-local-development.source-control.refresh",
+				"title": "Refresh JS Fiddle status",
+				"icon": {
+					"light": "resources/icons/light/refresh.svg",
+					"dark": "resources/icons/dark/refresh.svg"
+				}
+			},
+			{
+				"command": "powerapps-portal-local-development.source-control.discard",
+				"title": "Discards local changes to JS Fiddle",
+				"icon": {
+					"light": "resources/icons/light/discard.svg",
+					"dark": "resources/icons/dark/discard.svg"
+				}
+			},
+			{
+				"command": "powerapps-portal-local-development.source-control.checkout",
+				"title": "Checkout another version of this Fiddle",
+				"icon": {
+					"light": "resources/icons/light/refresh.svg",
+					"dark": "resources/icons/dark/refresh.svg"
+				}
+			},
+			{
+				"command": "powerapps-portal-local-development.source-control.browse",
+				"title": "Open current Fiddle in the default browser"
+			},
+			{
+				"command": "powerapps-portal-local-development.configureExtension",
+				"title": "PowerApps Portals: Configure"
 			}
-		]
+		],
+		"configuration": {
+			"type": "object",
+			"title": "PowerApps Portal Configuration",
+			"properties": {
+				"powerappsPortals.aadTenantId": {
+					"type": "string",
+					"default": "",
+					"description": "Id of the tenant for where the Azure AD app registration is registered in"
+				},
+				"powerappsPortals.dynamicsInstanceName": {
+					"type": "string",
+					"default": "",
+					"description": "the name of your instance. E.g. org7acas9gc if the url to your org is org7c98f08c.crm4.dynamics.com"
+				},
+				"powerappsPortals.dynamicsCrmRegion": {
+					"type": "string",
+					"enum": [
+						"crm",
+						"crm2",
+						"crm3",
+						"crm4",
+						"crm5",
+						"crm6",
+						"crm7",
+						"crm8",
+						"crm9",
+						"crm11"
+					],
+					"enumDescriptions": [
+						"North America",
+						"South America",
+						"Canada",
+						"EMEA",
+						"APAC",
+						"Australia",
+						"Japan",
+						"India",
+						"North America 2 (US Gov)",
+						"UK"
+					],
+					"default": "",
+					"description": "Portal Region"
+				},
+				"powerappsPortals.aadClientId": {
+					"type": "string",
+					"default": "",
+					"description": "Client Id of your AAD app registration e.g. 65f4ee4c-bbec-4059-b2ce-05e8e8acc679"
+				}
+			}
+		},
+		"menus": {
+			"scm/title": [
+				{
+					"command": "powerapps-portal-local-development.source-control.commit",
+					"group": "navigation",
+					"when": "scmProvider == powerappsPortal"
+				},
+				{
+					"command": "powerapps-portal-local-development.source-control.discard",
+					"group": "navigation",
+					"when": "scmProvider == powerappsPortal"
+				},
+				{
+					"command": "powerapps-portal-local-development.source-control.refresh",
+					"group": "navigation",
+					"when": "scmProvider == powerappsPortal"
+				},
+				{
+					"command": "powerapps-portal-local-development.source-control.browse",
+					"when": "scmProvider == powerappsPortal"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
@@ -40,6 +149,11 @@
 		"glob": "^7.1.6",
 		"mocha": "^8.1.3",
 		"typescript": "^4.0.2",
-		"vscode-test": "^1.4.0"
+		"vscode-test": "^1.4.0",
+		"@types/keytar": "4.0.1"
+	},
+	"dependencies": {
+		"adal-node": "^0.2.1",
+		"dynamics-web-api": "^1.6.12"
 	}
 }
