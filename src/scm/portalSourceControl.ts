@@ -17,9 +17,14 @@ import {
 } from 'vscode';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import * as afs from './afs';
-import { PowerAppsPortalRepository } from './portalRepository';
-import path = require('path');
+import {
+	FOLDER_CONTENT_SNIPPETS,
+	FOLDER_TEMPLATES,
+	FOLDER_WEB_FILES,
+	PowerAppsPortalRepository,
+} from './portalRepository';
 import { PortalData, PortalFileType } from '../models/portalData';
+import path = require('path');
 
 export class PowerAppsPortalSourceControl implements Disposable {
 	private portalScm: SourceControl;
@@ -56,8 +61,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		context.subscriptions.push(fileSystemWatcher);
 	}
 
-	private async getLocalResourceText(extension: string) {
-		const document = await workspace.openTextDocument(this.portalRepository.createLocalResourcePath(extension));
+	private async getLocalResourceText(fileName: string, fileType: PortalFileType) {
+		const document = await workspace.openTextDocument(
+			this.portalRepository.createLocalResourcePath(fileName, fileType)
+		);
 		return document.getText();
 	}
 
@@ -75,20 +82,20 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	/** Resets the given local file content to the checked-out version. */
-	private async resetFile(fileId: string, fileType: PortalFileType): Promise<void> {
-		const filePath = this.portalRepository.createLocalResourcePath(fileType);
+	private async resetFile(fileName: string, fileType: PortalFileType): Promise<void> {
+		const filePath = this.portalRepository.createLocalResourcePath(fileName, fileType);
 
 		let fileContent: string = '';
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				fileContent = this.portalData.data.contentSnippet.get(fileId)?.source || '';
+				fileContent = this.portalData.data.contentSnippet.get(fileName)?.source || '';
 				break;
 
 			case PortalFileType.webTemplate:
-				fileContent = this.portalData.data.webTemplate.get(fileId)?.source || '';
+				fileContent = this.portalData.data.webTemplate.get(fileName)?.source || '';
 				break;
-		
+
 			default:
 				break;
 		}
@@ -159,23 +166,30 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 	/** Determines whether the resource is different, regardless of line endings. */
 	isDirty(doc: TextDocument): boolean {
-		const originalText = this.portalData.data[toExtension(doc.uri)];
+		const originalText = this.portalData.getDocumentContent(doc.uri);
+		if (!originalText) {
+			return true;
+		}
 		return originalText.replace('\r', '') !== doc.getText().replace('\r', '');
 	}
 
 	toSourceControlResourceState(docUri: Uri, deleted: boolean): SourceControlResourceState {
 		const repositoryUri = this.portalRepository.provideOriginalResource(docUri, null);
 
-		const fiddlePart = toExtension(docUri).toUpperCase();
+		const fiddlePart = getFilename(docUri).toUpperCase();
 
-		const command: Command = !deleted
+		const command: Command | undefined = !deleted
 			? {
 					title: 'Show changes',
 					command: 'diff',
-					arguments: [repositoryUri, docUri, `JSFiddle#${this.portalData.instanceName} ${fiddlePart} ↔ Local changes`],
+					arguments: [
+						repositoryUri,
+						docUri,
+						`JSFiddle#${this.portalData.instanceName} ${fiddlePart} ↔ Local changes`,
+					],
 					tooltip: 'Diff your changes',
 			  }
-			: null;
+			: undefined;
 
 		const resourceState: SourceControlResourceState = {
 			resourceUri: docUri,
@@ -199,6 +213,21 @@ export class PowerAppsPortalSourceControl implements Disposable {
  * Gets extension trimming the dot character.
  * @param uri document uri
  */
-export function toExtension(uri: Uri): string {
-	return path.extname(uri.fsPath).substr(1);
+export function getFilename(uri: Uri): string {
+	return path.basename(uri.fsPath).split('.')[0];
+}
+
+export function getFileType(uri: Uri): PortalFileType {
+	const folders = path.dirname(uri.fsPath).split(path.sep);
+	const fileFolder = folders[folders.length - 1];
+	switch (fileFolder) {
+		case FOLDER_CONTENT_SNIPPETS:
+			return PortalFileType.contentSnippet;
+		case FOLDER_TEMPLATES:
+			return PortalFileType.webTemplate;
+		case FOLDER_WEB_FILES:
+			return PortalFileType.webFile;
+		default:
+			throw Error(`Unknown portal file type: ${fileFolder}.`);
+	}
 }

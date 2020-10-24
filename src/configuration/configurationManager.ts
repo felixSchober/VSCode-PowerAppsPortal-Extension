@@ -8,6 +8,8 @@ export class ConfigurationManager {
 	d365InstanceName: string | undefined;
 	d365CrmRegion: string | undefined;
 	credentialManager: CredentialManager | undefined;
+	portalId: string | undefined;
+	portalName: string | undefined;
 
 	constructor() {
 	}

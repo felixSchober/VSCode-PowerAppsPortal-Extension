@@ -1,23 +1,30 @@
-import { CancellationToken, ProviderResult, QuickDiffProvider, Uri, workspace, WorkspaceFolder } from "vscode";
+import { CancellationToken, ExtensionContext, ProviderResult, QuickDiffProvider, Uri, window, workspace, WorkspaceFolder } from "vscode";
 import * as path from 'path';
 import { ConfigurationManager } from "../configuration/configurationManager";
-import { PortalFileType } from "../models/portalData";
+import { PortalData, PortalFileType } from "../models/portalData";
+import { DynamicsApi } from "../api/dynamicsApi";
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
 export const FOLDER_TEMPLATES = 'Web Templates';
+export const FOLDER_WEB_FILES = 'Web Files';
 
 export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 	private workspaceFolder: WorkspaceFolder; 
 	private configurationManager: ConfigurationManager;
+	private d365WebApi: DynamicsApi;
+	public portalName: string | undefined;
+	public portalId: string | undefined;
+	private portalData: PortalData | undefined;
 
 	constructor(workspaceFolder: WorkspaceFolder, configurationManager: ConfigurationManager) {
 		this.workspaceFolder = workspaceFolder;
 		this.configurationManager = configurationManager;
+		this.d365WebApi = new DynamicsApi(this.configurationManager);
 	}
 
-	provideOriginalResource?(uri: Uri, token: CancellationToken): ProviderResult<Uri> {
+	provideOriginalResource(uri: Uri, token: CancellationToken | null): ProviderResult<Uri> {
 		const relativePath = workspace.asRelativePath(uri.fsPath);
 		return Uri.parse(`${POWERAPPSPORTAL_SCHEME}:${relativePath}`);
 	}
@@ -26,10 +33,23 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	 * Enumerates the resources under source control.
 	 */
 	provideSourceControlledResources(): Uri[] {
-		return [
-			Uri.file(this.createLocalResourcePath('html')),
-			Uri.file(this.createLocalResourcePath('js')),
-			Uri.file(this.createLocalResourcePath('css'))];
+		const result: Array<Uri> = new Array<Uri>();
+
+		if (!this.portalData) {
+			return result;
+		}
+
+		for (const template of this.portalData.data.webTemplate.values()) {
+			const f = Uri.file(this.createLocalResourcePath(template.name, PortalFileType.webTemplate));
+			result.push(f);
+		}
+
+		for (const snippet of this.portalData.data.contentSnippet.values()) {
+			const f = Uri.file(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
+			result.push(f);
+		}
+
+		return result;
 	}
 
 	/**
@@ -39,16 +59,61 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	 * @param extension fiddle part, which is also used as a file extension
 	 * @returns path of the locally cloned fiddle resource ending with the given extension
 	 */
-	createLocalResourcePath(fileType: PortalFileType) {
-		
+	createLocalResourcePath(fileName: string, fileType: PortalFileType) {
+		let fileTypePath = '';
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				
+				fileTypePath = FOLDER_CONTENT_SNIPPETS;
+				break;
+
+			case PortalFileType.webFile:
+				fileTypePath = FOLDER_WEB_FILES;
+				break;
+
+			case PortalFileType.webTemplate:
+				fileTypePath = FOLDER_TEMPLATES;
 				break;
 		
 			default:
 				break;
 		}
-		return path.join(this.workspaceFolder.uri.fsPath, 'test' + '.' + extension);
+		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName);
+	}
+
+	public async download(): Promise<PortalData>{
+		const portalId = await this.choosePortal();
+		const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+		if (!portalId) {
+			console.error('Could not get portal id.');
+			return result;
+		}
+
+		const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
+
+		for (const template of webTemplates) {
+			result.data.webTemplate.set(template.name, template);
+		}
+
+		const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
+
+		for (const snippet of contentSnippets) {
+			result.data.contentSnippet.set(snippet.name, snippet);
+		}
+
+		this.portalData = result;
+		return result;
+	}
+
+	private async choosePortal(): Promise<string | undefined> {
+		const portals = await this.d365WebApi.getPortals();
+		const portalChoice = await window.showQuickPick(new Array(...portals.keys()), { placeHolder: 'Select Portal', ignoreFocusOut: true});
+
+		if (!portalChoice) {
+			return;
+		}
+
+		this.portalName = portalChoice;
+		this.portalId = portals.get(portalChoice);
+		return this.portalId;
 	}
 }

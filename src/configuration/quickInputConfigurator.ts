@@ -40,9 +40,6 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		{label: 'crm11', description: 'UK'}
 	];
 
-	
-
-
 	async function collectInputs() {
 		const state = {} as Partial<ConfigurationState>;
 		await MultiStepInput.run((input) => inputInstanceName(input, state));

@@ -1,6 +1,9 @@
 var dynamicsWebApi = require('dynamics-web-api');
 import { RetrieveMultipleRequest, RetrieveRequest } from 'dynamics-web-api';
+import { relative } from 'path';
 import { ConfigurationManager } from '../configuration/configurationManager';
+import { ContentSnippet } from '../models/ContentSnippet';
+import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365Note } from '../models/interfaces/d365Note';
 import { ID365PublishingState } from '../models/interfaces/d365PublishingState';
 import { ID365WebFile } from '../models/interfaces/d365WebFile';
@@ -42,6 +45,23 @@ export class DynamicsApi {
 		}
 
 		const result = response.value[0];
+		return result;
+	}
+
+	public async getPortals(): Promise<Map<string, string>> {
+		const result = new Map<string, string>();
+
+		const request: RetrieveMultipleRequest = {
+			select: ['adx_websiteid', 'adx_name'],
+		};
+		const response = await this.webApi.retrieveAllRequest<ID365Website>(request);
+		if (!response.value) {
+			return result;
+		}
+
+		for (const website of response.value) {
+			result.set(website.adx_name, website.adx_websiteid);
+		}
 		return result;
 	}
 
@@ -90,6 +110,35 @@ export class DynamicsApi {
 
 		const result = response.value[0].adx_publishingstateid;
 		return result;
+	}
+
+	public async getContentSnippets(websiteId: string): Promise<Array<ContentSnippet>> {
+		const request: RetrieveMultipleRequest = {
+			collection: 'adx_contentsnippets',
+			select: [
+				'adx_name',
+				'adx_value',
+				'adx_contentsnippetid',
+				'versionnumber',
+				'_adx_contentsnippetlanguageid_value',
+			],
+			filter: '_adx_websiteid_value eq ' + websiteId,
+		};
+		const response = await this.webApi.retrieveAllRequest<ID365ContentSnippet>(request);
+		if (!response.value || response.value?.length === 0) {
+			throw Error(`Could not get content snippets from dynamics instance for website with id ${websiteId}.`);
+		}
+
+		return response.value.map(
+			(c) =>
+				new ContentSnippet(
+					c.adx_value,
+					c._adx_contentsnippetlanguageid_value,
+					c.versionnumber,
+					c.adx_contentsnippetid,
+					c.adx_name
+				)
+		);
 	}
 
 	public async getWebTemplates(websiteId: string): Promise<Array<WebTemplate>> {
