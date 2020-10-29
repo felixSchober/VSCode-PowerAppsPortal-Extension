@@ -53,6 +53,7 @@ export class DynamicsApi {
 
 		const request: RetrieveMultipleRequest = {
 			select: ['adx_websiteid', 'adx_name'],
+			collection: 'adx_websites'
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365Website>(request);
 		if (!response.value) {

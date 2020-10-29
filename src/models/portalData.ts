@@ -22,10 +22,12 @@ export class PortalData {
 	}
 
 	public getDocumentContent(uri: Uri): string | undefined {
-		const fileName = getFilename(uri);
+		let fileName = getFilename(uri);
 		const fileType = getFileType(uri);
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
+				fileName = fileName.replace(/_/g, '/');
+
 				return this.data.contentSnippet.get(fileName)?.source;
 			case PortalFileType.webTemplate:
 				return this.data.webTemplate.get(fileName)?.source;

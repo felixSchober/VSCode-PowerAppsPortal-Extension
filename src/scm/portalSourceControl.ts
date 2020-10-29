@@ -25,6 +25,7 @@ import {
 } from './portalRepository';
 import { PortalData, PortalFileType } from '../models/portalData';
 import path = require('path');
+import { Utils } from '../utils';
 
 export class PowerAppsPortalSourceControl implements Disposable {
 	private portalScm: SourceControl;
@@ -53,9 +54,27 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.registerFileSystemWatcher(context, workspaceFolder);
 	}
 
+	public static async getPortalScm(
+		context: ExtensionContext,
+		workspaceFolder: WorkspaceFolder,
+		configurationManager: ConfigurationManager
+	) {
+		const portalScm = new PowerAppsPortalSourceControl(context, workspaceFolder, configurationManager);
+		console.log('Downloading portal data');
+		const portalData = await portalScm.portalRepository.download();
+		console.log('Portal Data downloaded');
+		portalScm.portalData = portalData;
+		// clone portal to the local workspace
+		portalScm.setPortalData(portalData, true);
+		return portalScm;
+	}
+
 	private registerFileSystemWatcher(context: ExtensionContext, workspaceFolder: WorkspaceFolder) {
-		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, '*.*'));
-		fileSystemWatcher.onDidChange((uri) => this.onResourceChange(uri), context.subscriptions);
+		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, '**/*.*'));
+		fileSystemWatcher.onDidChange((uri) => {
+			console.log("File change");
+			this.onResourceChange(uri);
+		}, context.subscriptions);
 		fileSystemWatcher.onDidCreate((uri) => this.onResourceChange(uri), context.subscriptions);
 		fileSystemWatcher.onDidDelete((uri) => this.onResourceChange(uri), context.subscriptions);
 		context.subscriptions.push(fileSystemWatcher);
@@ -68,16 +87,61 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		return document.getText();
 	}
 
+	private refreshStatusBar() {
+		this.portalScm.statusBarCommands = [
+			{
+				command: 'extension.source-control.checkout',
+				arguments: [this],
+				title: `↕ ${this.portalData.portalName}@${this.portalData.instanceName}`,
+				tooltip: 'Checkout portal.',
+			},
+		];
+	}
+
+	async commitAll(): Promise<void> {
+		if (!this.changedResources.resourceStates.length) {
+			window.showErrorMessage('There is nothing to commit.');
+		} else {
+			console.log('Commit data');
+			// const html = await this.getLocalResourceText('html');
+			// const js = await this.getLocalResourceText('js');
+			// const css = await this.getLocalResourceText('css');
+
+			// // here we assume nobody updated the Fiddle on the server since we refreshed the list of versions
+			// try {
+			// 	const newFiddle = await uploadFiddle(
+			// 		this.fiddle.slug,
+			// 		this.fiddle.version + 1,
+			// 		html,
+			// 		js,
+			// 		css
+			// 	);
+			// 	if (!newFiddle) {
+			// 		return;
+			// 	}
+			// 	this.setFiddle(newFiddle, false);
+			// 	this.jsFiddleScm.inputBox.value = '';
+			// } catch (ex) {
+			// 	vscode.window.showErrorMessage('Cannot commit changes to JS Fiddle. ' + ex.message);
+			// }
+		}
+	}
+
 	/**
 	 * Throws away all local changes and resets all files to the checked out version of the repository.
 	 */
 	resetFilesToCheckedOutVersion(): void {
+		// create folder structure
+		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_CONTENT_SNIPPETS));
+		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES));
+		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES));
+
 		for (const snippet of this.portalData.data.contentSnippet.values()) {
-			this.resetFile(snippet.id, PortalFileType.contentSnippet);
+			this.resetFile(snippet.name, PortalFileType.contentSnippet);
 		}
 
 		for (const template of this.portalData.data.webTemplate.values()) {
-			this.resetFile(template.name, PortalFileType.contentSnippet);
+			this.resetFile(template.name, PortalFileType.webTemplate);
 		}
 	}
 
@@ -101,6 +165,31 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		}
 
 		await afs.writeFile(filePath, fileContent);
+	}
+
+	async tryCheckout(): Promise<void> {
+		if (this.changedResources.resourceStates.length) {
+			const changedResourcesCount = this.changedResources.resourceStates.length;
+			window.showErrorMessage(
+				`There is one or more changed resources. Discard or commit your local changes before checking out another version.`
+			);
+		} else {
+			try {
+				const newPortalData = await this.portalRepository.download();
+				this.setPortalData(newPortalData, true);
+			} catch (ex) {
+				window.showErrorMessage(ex);
+			}
+		}
+	}
+
+	private setPortalData(newPortalData: PortalData, overwrite: boolean) {
+		this.portalData = newPortalData;
+		if (overwrite) {
+			this.resetFilesToCheckedOutVersion();
+		} // overwrite local file content
+		this._onRepositoryChange.fire(this.portalData);
+		this.refreshStatusBar();
 	}
 
 	getWorkspaceFolder(): WorkspaceFolder {
@@ -166,11 +255,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 	/** Determines whether the resource is different, regardless of line endings. */
 	isDirty(doc: TextDocument): boolean {
-		const originalText = this.portalData.getDocumentContent(doc.uri);
-		if (!originalText) {
-			return true;
-		}
-		return originalText.replace('\r', '') !== doc.getText().replace('\r', '');
+		const originalText = this.portalData.getDocumentContent(doc.uri) || '';
+		// if (!originalText) {
+		// 	return true;
+		// }
+		const isDirty = originalText.replace(/\n/g, '').replace(/\r/g, '') !== doc.getText().replace(/\n/g, '').replace(/\r/g, '');
+		return isDirty;
 	}
 
 	toSourceControlResourceState(docUri: Uri, deleted: boolean): SourceControlResourceState {
@@ -206,6 +296,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	dispose() {
 		this._onRepositoryChange.dispose();
 		this.portalScm.dispose();
+	}
+
+	getPortalData(): PortalData {
+		return this.portalData;
 	}
 }
 

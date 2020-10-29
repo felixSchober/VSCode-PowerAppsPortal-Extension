@@ -61,6 +61,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	 */
 	createLocalResourcePath(fileName: string, fileType: PortalFileType) {
 		let fileTypePath = '';
+		fileName = fileName.replace(/\//g, '_');
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
 				fileTypePath = FOLDER_CONTENT_SNIPPETS;
@@ -77,7 +78,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			default:
 				break;
 		}
-		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName);
+		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName + '.html');
 	}
 
 	public async download(): Promise<PortalData>{

@@ -23,20 +23,21 @@ export function activate(context: vscode.ExtensionContext) {
 		return;
 	}
 
+	const workspaceFolder = getWorkspaceFolder();
+
 	const configurationManager = new ConfigurationManager();
-	portalDocumentContentProvider = new PowerAppsPortalDocumentContentProvider();
+	portalDocumentContentProvider = new PowerAppsPortalDocumentContentProvider(workspaceFolder);
 
 	const configureExtensionCommand = vscode.commands.registerCommand(
 		'powerapps-portal-local-development.configureExtension',
 		async () => {
-			await configureExtension(configurationManager, workFolderPath, context);
+			await configureExtension(configurationManager, workFolderPath, workspaceFolder, context);
 		}
 	);
 	context.subscriptions.push(configureExtensionCommand);
 
 
 	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(POWERAPPSPORTAL_SCHEME, portalDocumentContentProvider));
-
 	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(e => {
 		try {
 			// initialize new source control for manually added workspace folders
@@ -53,6 +54,8 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
+	
+	
 	// let disposable = vscode.commands.registerCommand('powerapps-portal-local-development.helloWorld', () => {
 	// 	// The code you place here will be executed every time your command is executed
 
@@ -86,7 +89,7 @@ async function initializeFolderFromConfiguration(folder: vscode.WorkspaceFolder,
 
 function registerPowerAppsPortalSourceControl(powerappsSourceControl: PowerAppsPortalSourceControl, context: vscode.ExtensionContext) {
 	// update the fiddle document content provider with the latest content
-	portalDocumentContentProvider.updated(powerappsSourceControl.getFiddle());
+	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData());
 
 	// every time the repository is updated with new fiddle version, notify the content provider
 	powerappsSourceControl.onRepositoryChange(fiddle => portalDocumentContentProvider.updated(fiddle));
@@ -111,9 +114,14 @@ function unregisterPortalSourceControl(folderUri: vscode.Uri): void {
 	}
 }
 
+async function start(folder: vscode.WorkspaceFolder, context: vscode.ExtensionContext, configurationManager: ConfigurationManager) {
+	
+}
+
 async function configureExtension(
 	configurationManager: ConfigurationManager,
 	workFolderPath: string,
+	workspaceFolder: vscode.WorkspaceFolder,
 	context: vscode.ExtensionContext
 ) {
 	try {
@@ -127,42 +135,26 @@ async function configureExtension(
 	} else {
 		vscode.window.showErrorMessage('Could not load configuration. Please try again.');
 	}
+
+	// register source control
+	const portalScm = await PowerAppsPortalSourceControl.getPortalScm(context, workspaceFolder, configurationManager);
+	registerPowerAppsPortalSourceControl(portalScm, context);
+
+	
+	// show the file explorer with the three new files
+	vscode.commands.executeCommand("workbench.view.explorer");
+
 }
 
 function getWorkspacePath(): string {
+	return getWorkspaceFolder().uri.fsPath;
+}
+
+function getWorkspaceFolder(): vscode.WorkspaceFolder {
 	const ws = vscode.workspace.workspaceFolders || [];
 	if (ws.length === 0) {
 		throw new Error('There is no open folder in visual studio code.');
 	}
 
-	return ws[0].uri.fsPath;
-}
-
-async function syncFromDynamicsInstance(d365Api: DynamicsApi): Promise<void> {
-	const portalId = await d365Api.getPortalId('Customer Self-Service');
-	const webTemplates = await d365Api.getWebTemplates(portalId);
-
-	vscode.window.showInformationMessage(`Found ${webTemplates.length} web templates`);
-}
-
-async function createPortalFolderStructure() {
-	const wsPath = getWorkspacePath();
-
-	const webTemplatePathName = 'Web Templates';
-	const contentSnippetsPathName = 'Content Snippets';
-	const assetsPathName = 'Assets';
-	const imagesPathName = 'Images';
-	const stylesPathName = 'Style';
-	const fontsPathName = 'Fonts';
-	const miscPathName = 'Misc';
-
-	await Utils.createFolder(path.join(wsPath, webTemplatePathName));
-	await Utils.createFolder(path.join(wsPath, contentSnippetsPathName));
-
-	const assetsPath = path.join(wsPath, assetsPathName);
-	await Utils.createFolder(assetsPath);
-	await Utils.createFolder(path.join(assetsPath, imagesPathName));
-	await Utils.createFolder(path.join(assetsPath, stylesPathName));
-	await Utils.createFolder(path.join(assetsPath, fontsPathName));
-	await Utils.createFolder(path.join(assetsPath, miscPathName));
+	return ws[0];
 }
