@@ -266,16 +266,16 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	toSourceControlResourceState(docUri: Uri, deleted: boolean): SourceControlResourceState {
 		const repositoryUri = this.portalRepository.provideOriginalResource(docUri, null);
 
-		const fiddlePart = getFilename(docUri).toUpperCase();
+		const fileName = getFilename(docUri).split('.')[0];
 
 		const command: Command | undefined = !deleted
 			? {
 					title: 'Show changes',
-					command: 'diff',
+					command: 'vscode.diff',
 					arguments: [
 						repositoryUri,
 						docUri,
-						`JSFiddle#${this.portalData.instanceName} ${fiddlePart} ↔ Local changes`,
+						`${this.portalData.portalName} ${this.portalData.instanceName} ${fileName} ↔ Local changes`,
 					],
 					tooltip: 'Diff your changes',
 			  }
