@@ -4,6 +4,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 export const UTF8 = 'utf8';
+export const BASE64 = 'base64';
 
 function handleResult<T>(resolve: (result: T) => void, reject: (error: Error) => void, error: Error | null | undefined, result: T): void {
 	if (error) {
@@ -39,9 +40,15 @@ export function readFile(path: string): Promise<Buffer> {
 	});
 }
 
-export function writeFile(path: string, content: any): Promise<void> {
+export function writeDocument(path: string, content: any): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		fs.writeFile(path, content, error => handleResult(resolve, reject, error, void 0));
+	});
+}
+
+export function writeBase64File(path: string, content: any): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		fs.writeFile(path, content, {encoding: BASE64}, error => handleResult(resolve, reject, error, void 0));
 	});
 }
 

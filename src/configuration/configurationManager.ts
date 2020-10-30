@@ -142,7 +142,7 @@ export class ConfigurationManager {
 		const configString = JSON.stringify(config);
 		const configFilePath = this.getConfigurationFilePath();
 		console.log(`[CONFIG] Save portal config file to ${configFilePath}`);
-		await afs.writeFile(
+		await afs.writeDocument(
 			configFilePath,
 			Buffer.from(configString, afs.UTF8)
 		);

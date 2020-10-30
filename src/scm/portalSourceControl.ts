@@ -34,6 +34,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private _onRepositoryChange = new EventEmitter<PortalData>();
 	private timeout?: NodeJS.Timer;
 	private portalData!: PortalData;
+	private changedGroup: Uri[] = [];
 
 	constructor(
 		context: ExtensionContext,
@@ -90,7 +91,6 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private registerFileSystemWatcher(context: ExtensionContext, workspaceFolder: WorkspaceFolder) {
 		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, '**/*.*'));
 		fileSystemWatcher.onDidChange((uri) => {
-			console.log('[SCM] File change');
 			this.onResourceChange(uri);
 		}, context.subscriptions);
 		fileSystemWatcher.onDidCreate((uri) => this.onResourceChange(uri), context.subscriptions);
@@ -161,6 +161,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		for (const template of this.portalData.data.webTemplate.values()) {
 			this.resetFile(template.name, PortalFileType.webTemplate);
 		}
+
+		for (const webFile of this.portalData.data.webFile.values()) {
+			this.resetFile(webFile.d365Note.filename, PortalFileType.webFile);
+		}
 	}
 
 	/** Resets the given local file content to the checked-out version. */
@@ -172,17 +176,23 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
 				fileContent = this.portalData.data.contentSnippet.get(fileName)?.source || '';
+				await afs.writeDocument(filePath, fileContent);
 				break;
 
 			case PortalFileType.webTemplate:
 				fileContent = this.portalData.data.webTemplate.get(fileName)?.source || '';
+				await afs.writeDocument(filePath, fileContent);
+				break;
+
+			case PortalFileType.webFile:
+				fileContent = this.portalData.data.webFile.get(fileName)?.b64Content || '';
+				await afs.writeBase64File(filePath, fileContent);
 				break;
 
 			default:
 				break;
 		}
 
-		await afs.writeFile(filePath, fileContent);
 	}
 
 	async tryCheckout(): Promise<void> {
@@ -237,10 +247,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		if (this.timeout) {
 			clearTimeout(this.timeout);
 		}
+		this.changedGroup.push(_uri);
 		this.timeout = setTimeout(() => this.tryUpdateChangedGroup(), 500);
 	}
 
 	async tryUpdateChangedGroup(): Promise<void> {
+		console.log(`[SCM] Update ${this.changedGroup.length} files.`);
 		try {
 			await this.updateChangedGroup();
 		} catch (ex) {
@@ -253,7 +265,9 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// for simplicity we ignore which document was changed in this event and scan all of them
 		const changedResources: SourceControlResourceState[] = [];
 
-		const uris = this.portalRepository.provideSourceControlledResources();
+		//const uris = this.portalRepository.provideSourceControlledResources();
+		const uris = this.changedGroup;
+		this.changedGroup = [];
 
 		for (const uri of uris) {
 			let isDirty: boolean;

@@ -78,7 +78,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 			case PortalFileType.webFile:
 				fileTypePath = FOLDER_WEB_FILES;
-				break;
+				return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName);
 
 			case PortalFileType.webTemplate:
 				fileTypePath = FOLDER_TEMPLATES;
@@ -143,10 +143,14 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				result.data.contentSnippet.set(snippet.name, snippet);
 			}
 
+			const webFiles = await this.d365WebApi.getWebFiles(portalId);
+			for (const file of webFiles) {
+				result.data.webFile.set(file.d365Note.filename, file);
+			}
 
 			progress.report({
 				increment: 20,
-				message: `Downloaded ${0} files`
+				message: `Downloaded ${webFiles.length} files`
 			});
 
 			this.portalData = result;

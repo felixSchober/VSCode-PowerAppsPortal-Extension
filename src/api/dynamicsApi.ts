@@ -10,6 +10,7 @@ import { ID365Webpage } from '../models/interfaces/d365Webpage';
 import { ID365Website } from '../models/interfaces/d365Website';
 import { ID365WebTemplate } from '../models/interfaces/d365WebTemplate';
 import { Language } from '../models/Language';
+import { WebFile } from '../models/WebFile';
 import { WebTemplate } from '../models/WebTemplate';
 import { CrmAdalConnectionSettings } from './adalConnection';
 
@@ -157,23 +158,51 @@ export class DynamicsApi {
 		return result;
 	}
 
-	public async getWebFiles(portalId: string): Promise<Array<ID365WebFile>> {
+	public async getWebFiles(portalId: string): Promise<Array<WebFile>> {
 		const select = ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value'];
 		const filter = '_adx_websiteid_value eq ' + portalId;
 
+		console.log('[D365 API] Getting web file');
 		const response = await this.webApi.retrieveMultiple<ID365WebFile>('adx_webfiles', select, filter);
-
 		if (!response.value) {
+			console.error("[D365 API] Could't get web files. Reponse value was empty.");
 			return [];
 		}
-		return response.value;
+
+		console.log('[D365 API] Getting web file notes');
+		const webFileNotes = await this.getWebFileNotes();
+
+		// create a map out of the web file notes with the key being the id of the corresponding webfile id.
+		const webFileNotesMap = new Map<string, ID365Note>(webFileNotes.map((note) => [note._objectid_value, note]));
+
+		let result: Array<WebFile> = [];
+		
+		for (const webFile of response.value) {
+			if (!webFile.adx_webfileid) {
+				throw Error(`Could not get web file with name ${webFile.adx_name} because id was undefined.`);
+			}
+			// get corresponding note
+			const note = webFileNotesMap.get(webFile.adx_webfileid);
+
+			if (!note) {
+				console.warn(`Could not get file contents for web file with id ${webFile.adx_webfileid} and name ${webFile.adx_name}`);
+				continue;
+			}
+
+			result.push(new WebFile(webFile, note));
+		}
+		
+		return result;
 	}
 
 	public async getWebFileNotes(): Promise<Array<ID365Note>> {
-		const select = ['annotationid', 'filename', 'isdocument'];
-		const filter = "objecttypecode eq 'adx_webfile'";
+		const request: RetrieveMultipleRequest = {
+			collection: 'annotations',
+			filter: "objecttypecode eq 'adx_webfile' and isdocument eq true",
+			select: ['annotationid', 'filename', 'isdocument', 'documentbody', 'filesize', 'versionnumber', '_objectid_value'],
+		};
 
-		const response = await this.webApi.retrieveMultiple<ID365Note>('annotations', select, filter);
+		const response = await this.webApi.retrieveAllRequest<ID365Note>(request);
 
 		if (!response.value) {
 			return [];
