@@ -58,6 +58,11 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			result.push(f);
 		}
 
+		for (const file of this.portalData.data.webFile.values()) {
+			const f = Uri.file(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
+			result.push(f);
+		}
+
 		return result;
 	}
 
@@ -102,6 +107,11 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
 			});
 
+			let progressMessage = `Downloading data`;
+			progress.report({
+				message: progressMessage
+			});
+
 			let portalId: string | undefined;
 			if (!this.configurationManager.isPortalDataConfigured) {
 				portalId = await this.choosePortal();
@@ -116,17 +126,19 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
 			}
 
+			progressMessage += `\n\tPortal resolved: ${this.portalName}`;
 			progress.report({
-				increment: 20,
-				message: 'Portal resolved: ' + this.portalName
+				increment: 25,
+				message: progressMessage + `\n\t… Templates`
 			});
 
 			const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
 			const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
 
+			progressMessage += `\n\t✓ Templates: ${webTemplates.length}`;
 			progress.report({
-				increment: 20,
-				message: `Downloaded ${webTemplates.length} web templates`
+				increment: 25,
+				message: progressMessage + `\n\t… Content Snippets`
 			});
 
 			for (const template of webTemplates) {
@@ -134,9 +146,11 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			}
 
 			const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
+			
+			progressMessage += `\n\t✓ Content Snippets: ${webTemplates.length}`;
 			progress.report({
-				increment: 20,
-				message: `Downloaded ${contentSnippets.length} content snippets`
+				increment: 25,
+				message: progressMessage + `\n\t… Files`
 			});
 
 			for (const snippet of contentSnippets) {
@@ -148,10 +162,13 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				result.data.webFile.set(file.d365Note.filename, file);
 			}
 
+			progressMessage += `\n\t✓ Files: ${webTemplates.length}`;
 			progress.report({
-				increment: 20,
-				message: `Downloaded ${webFiles.length} files`
+				increment: 25,
+				message: progressMessage
 			});
+
+			window.showInformationMessage(progressMessage);
 
 			this.portalData = result;
 			return result;

@@ -33,6 +33,10 @@ export class ConfigurationManager {
 		return false;
 	}
 
+	get instanceUrl(): string {
+		return `${this.d365InstanceName}.${this.d365CrmRegion}.dynamics.com`;
+	}
+
 	public async load(context: ExtensionContext) {
 		// either the values can be loaded from a configuration file or the configuration quickInput has to be used
 		try {

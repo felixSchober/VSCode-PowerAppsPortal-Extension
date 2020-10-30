@@ -1,4 +1,5 @@
 import { Uri } from 'vscode';
+import { BASE64 } from '../scm/afs';
 import { getFilename, getFileType } from '../scm/portalSourceControl';
 import { ContentSnippet } from './ContentSnippet';
 import { WebFile } from './WebFile';
@@ -19,18 +20,26 @@ export class PortalData {
 		};
 	}
 
-	public getDocumentContent(uri: Uri): string | undefined {
-		let fileName = getFilename(uri);
+	public getDocumentContent(uri: Uri, fileAsBase64: boolean = false): string {
 		const fileType = getFileType(uri);
+		let fileName = getFilename(uri, fileType);
+
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
 				fileName = fileName.replace(/_/g, '/');
 
-				return this.data.contentSnippet.get(fileName)?.source;
+				return this.data.contentSnippet.get(fileName)?.source || '';
 			case PortalFileType.webTemplate:
-				return this.data.webTemplate.get(fileName)?.source;
+				return this.data.webTemplate.get(fileName)?.source || '';
+			case PortalFileType.webFile:
+				const content = this.data.webFile.get(fileName)?.b64Content || '';
+				if (fileAsBase64) {
+					return content;
+				}
+				const decodedContent = Buffer.from(content, BASE64).toString();
+				return decodedContent;
 			default:
-				return;
+				return '';
 		}
 	}
 }

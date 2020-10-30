@@ -8,16 +8,12 @@ import {
 	Uri,
 	WorkspaceFolder,
 } from 'vscode';
-import { ContentSnippet } from '../models/ContentSnippet';
-import { PortalData, PortalFileType } from '../models/portalData';
-import { WebTemplate } from '../models/WebTemplate';
+import { PortalData } from '../models/portalData';
 import * as path from 'path';
-import { FOLDER_TEMPLATES } from './portalRepository';
+import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from './portalRepository';
 
 export class PowerAppsPortalDocumentContentProvider implements TextDocumentContentProvider, Disposable {
 	private _onDidChange = new EventEmitter<Uri>();
-	private webTemplates = new Map<string, WebTemplate>();
-	private contentSnippets = new Map<string, ContentSnippet>();
 	private portalData: PortalData | undefined;
 
 	constructor(private readonly workspaceFolder: WorkspaceFolder) {}
@@ -36,6 +32,16 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 			this._onDidChange.fire(Uri.parse(fn));
 		}
 
+		for (const updatedDocument of updatedPortalData.data.contentSnippet.values()) {
+			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_CONTENT_SNIPPETS, updatedDocument.name + '.html');
+			this._onDidChange.fire(Uri.parse(fn));
+		}
+
+		for (const updatedFile of updatedPortalData.data.webFile.values()) {
+			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES, updatedFile.d365Note.filename);
+			this._onDidChange.fire(Uri.parse(fn));
+		}
+
 		this.portalData = updatedPortalData;
 	}
 
@@ -45,7 +51,8 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 		}
 
 		if (!this.portalData) {
-			return 'Canceled';
+			console.warn(`Could not get data for document ${uri.fsPath}`);
+			return '';
 		}
 
 		return this.portalData.getDocumentContent(uri);

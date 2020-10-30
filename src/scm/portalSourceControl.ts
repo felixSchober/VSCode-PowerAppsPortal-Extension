@@ -35,6 +35,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private timeout?: NodeJS.Timer;
 	private portalData!: PortalData;
 	private changedGroup: Uri[] = [];
+	private changedResourceStates: SourceControlResourceState[] = [];
 
 	constructor(
 		context: ExtensionContext,
@@ -84,7 +85,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		portalScm.portalData = portalData;
 
 		// clone portal to the local workspace
-		portalScm.setPortalData(portalData, overwrite);
+		await portalScm.setPortalData(portalData, overwrite);
 		return portalScm;
 	}
 
@@ -206,14 +207,14 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				const newPortalData = await this.portalRepository.download();
 
 				// force set data (overwrite = true)
-				this.setPortalData(newPortalData, true);
+				await this.setPortalData(newPortalData, true);
 			} catch (ex) {
 				window.showErrorMessage(ex);
 			}
 		}
 	}
 
-	private setPortalData(newPortalData: PortalData, overwrite: boolean) {
+	private async setPortalData(newPortalData: PortalData, overwrite: boolean) {
 		console.log(`[SCM] Setting portal data. Overwrite: ${overwrite}.\n[SCM] =========================================`);
 		console.log(`\tOld Snippets: ${this.portalData?.data.contentSnippet.size}.`);
 		console.log(`\tNew Snippets: ${newPortalData.data.contentSnippet.size}.`);
@@ -227,8 +228,14 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			// overwrite local file content
 			this.resetFilesToCheckedOutVersion();
 		}
+
+		// initially, mark all files as changed
+		this.changedGroup = this.portalRepository.provideSourceControlledResources();
+
+
 		this._onRepositoryChange.fire(this.portalData);
 		this.refreshStatusBar();
+		await this.tryUpdateChangedGroup();
 	}
 
 	getWorkspaceFolder(): WorkspaceFolder {
@@ -263,9 +270,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	/** This is where the source control determines, which documents were updated, removed, and theoretically added. */
 	async updateChangedGroup(): Promise<void> {
 		// for simplicity we ignore which document was changed in this event and scan all of them
-		const changedResources: SourceControlResourceState[] = [];
+		
 
-		//const uris = this.portalRepository.provideSourceControlledResources();
 		const uris = this.changedGroup;
 		this.changedGroup = [];
 
@@ -276,8 +282,16 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			const pathExists = await afs.exists(uri.fsPath);
 
 			if (pathExists) {
-				const document = await workspace.openTextDocument(uri);
-				isDirty = this.isDirty(document);
+				let document: TextDocument;
+				try {
+					document = await workspace.openTextDocument(uri);
+					isDirty = this.isDirty(document);
+				} catch (error) {
+					const fileBuffer = await afs.readFile(uri.fsPath);
+					const encodedFile = fileBuffer.toString(afs.BASE64);
+					isDirty = this.isDirtyBase64(uri, encodedFile);
+				}
+				
 				wasDeleted = false;
 			} else {
 				isDirty = true;
@@ -286,11 +300,11 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 			if (isDirty) {
 				const resourceState = this.toSourceControlResourceState(uri, wasDeleted);
-				changedResources.push(resourceState);
+				this.changedResourceStates.push(resourceState);
 			}
 		}
 
-		this.changedResources.resourceStates = changedResources;
+		this.changedResources.resourceStates = this.changedResourceStates;
 
 		// the number of modified resources needs to be assigned to the SourceControl.count filed to let VS Code show the number.
 		this.portalScm.count = this.changedResources.resourceStates.length;
@@ -304,6 +318,25 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// }
 		const isDirty =
 			originalText.replace(/\n/g, '').replace(/\r/g, '') !== doc.getText().replace(/\n/g, '').replace(/\r/g, '');
+
+		if (isDirty) {
+			console.log(`[SCM]\t${doc.fileName} is dirty`);
+		}
+		return isDirty;
+	}
+
+	isDirtyBase64(originalDocUri: Uri, doc: string): boolean {
+		const originalText = this.portalData.getDocumentContent(originalDocUri, true) || '';
+		// if (!originalText) {
+		// 	return true;
+		// }
+		const isDirty =
+			originalText !== doc;
+
+		if (isDirty) {
+			console.log(`[SCM]\t${originalDocUri.fsPath} is dirty`);
+		}
+
 		return isDirty;
 	}
 
@@ -319,7 +352,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 					arguments: [
 						repositoryUri,
 						docUri,
-						`${this.portalData.portalName} ${this.portalData.instanceName} ${fileName} ↔ Local changes`,
+						`${this.portalData.instanceName} ${fileName} ↔ Local changes`,
 					],
 					tooltip: 'Diff your changes',
 			  }
@@ -351,7 +384,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
  * Gets extension trimming the dot character.
  * @param uri document uri
  */
-export function getFilename(uri: Uri): string {
+export function getFilename(uri: Uri, fileType?: PortalFileType): string {
+	if (fileType && fileType === PortalFileType.webFile) {
+		return path.basename(uri.fsPath);
+	}
 	return path.basename(uri.fsPath).split('.')[0];
 }
 
