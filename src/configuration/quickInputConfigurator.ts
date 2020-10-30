@@ -8,12 +8,10 @@ import {
 	QuickPickItem,
 	window,
 	Disposable,
-	CancellationToken,
 	QuickInputButton,
 	QuickInput,
 	ExtensionContext,
-	QuickInputButtons,
-	Uri,
+	QuickInputButtons
 } from 'vscode';
 import { Utils } from '../utils';
 
@@ -49,12 +47,11 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	const title = 'Connect to your instance';
 
 	async function inputInstanceName(input:MultiStepInput, state: Partial<ConfigurationState>) {
-		const additionalSteps = typeof state.instanceName === 'string' ? 1 : 0;
 		// TODO: Remember current value when navigating back.
 		state.instanceName = await input.showInputBox({
 			title,
-			step: 2 + additionalSteps,
-			totalSteps: 3 + additionalSteps,
+			step: 1,
+			totalSteps: 5,
 			value: state.instanceName || '',
 			prompt: 'Provide the name of your instance. E.g. org7acas9gc if the url to your org is org7c98f08c.crm4.dynamics.com',
 			validate: noValidation,
@@ -66,7 +63,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	async function pickEmeaRegion(input: MultiStepInput, state: Partial<ConfigurationState>) {
 		const pick = await input.showQuickPick({
 			title,
-			step: 1,
+			step: 2,
 			totalSteps: 5,
 			placeholder: 'Select your portal region',
 			items: crmRegions,
@@ -79,12 +76,10 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	}
 
 	async function inputTenantId(input:MultiStepInput, state: Partial<ConfigurationState>) {
-		const additionalSteps = typeof state.aadTenantId === 'string' ? 1 : 0;
-
 		state.aadTenantId = await input.showInputBox({
 			title,
-			step: 2 + additionalSteps,
-			totalSteps: 3 + additionalSteps,
+			step: 3,
+			totalSteps: 5,
 			value: state.aadTenantId || '',
 			prompt: 'Provide the tenant Id of your AAD instance e.g. 10ea4d3e-1511-4461-9c6d-e21e73840528',
 			validate: validateGuid,
@@ -95,12 +90,10 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 
 
 	async function inputClientId(input:MultiStepInput, state: Partial<ConfigurationState>) {
-		const additionalSteps = typeof state.aadClientId === 'string' ? 1 : 0;
-
 		state.aadClientId = await input.showInputBox({
 			title,
-			step: 2 + additionalSteps,
-			totalSteps: 3 + additionalSteps,
+			step: 4,
+			totalSteps: 5,
 			value: state.aadClientId || '',
 			prompt: 'Provide the client Id of your AAD app registration e.g. 65f4ee4c-bbec-4059-b2ce-05e8e8acc679',
 			validate: validateGuid,
@@ -110,12 +103,10 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	}
 
 	async function inputClientSecret(input:MultiStepInput, state: Partial<ConfigurationState>) {
-		const additionalSteps = typeof state.aadClientSecret === 'string' ? 1 : 0;
-
 		state.aadClientSecret = await input.showInputBox({
 			title,
-			step: 2 + additionalSteps,
-			totalSteps: 3 + additionalSteps,
+			step: 5,
+			totalSteps: 5,
 			value: state.aadClientSecret || '',
 			prompt: 'Provide the client secret',
 			validate: noValidation,
@@ -127,7 +118,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	function shouldResume() {
 		// Could show a notification with the option to resume.
 		return new Promise<boolean>((resolve, reject) => {
-			// noop
+			resolve(true);
 		});
 	}
 
@@ -193,6 +184,7 @@ class MultiStepInput {
 			if (this.current) {
 				this.current.enabled = false;
 				this.current.busy = true;
+				this.current.ignoreFocusOut = true;
 			}
 			try {
 				step = await step(this);

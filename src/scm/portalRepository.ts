@@ -1,5 +1,7 @@
 import {
 	CancellationToken,
+	ProgressLocation,
+	ProgressOptions,
 	ProviderResult,
 	QuickDiffProvider,
 	Uri,
@@ -89,34 +91,67 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	}
 
 	public async download(): Promise<PortalData> {
-		let portalId: string | undefined;
-		if (!this.configurationManager.isPortalDataConfigured) {
-			portalId = await this.choosePortal();
-		} else {
-			portalId = this.configurationManager.portalId;
-			this.portalName = this.configurationManager.portalName;
-		}
+		const progressOptions: ProgressOptions = {
+			location: ProgressLocation.Notification,
+			title: 'Downloading data from Dynamics',
+			cancellable: true
+		};
+		return window.withProgress(progressOptions, async (progress, token) => {
+			token.onCancellationRequested(() => {
+				console.log("User canceled the long running operation");
+				return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+			});
 
-		if (!portalId) {
-			console.error('[REPO] Could not get portal id either from existing configuration or from user.');
-			return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-		}
+			let portalId: string | undefined;
+			if (!this.configurationManager.isPortalDataConfigured) {
+				portalId = await this.choosePortal();
+			} else {
+				portalId = this.configurationManager.portalId;
+				this.portalName = this.configurationManager.portalName;
+			}
 
-		const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-		const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
 
-		for (const template of webTemplates) {
-			result.data.webTemplate.set(template.name, template);
-		}
+			if (!portalId) {
+				console.error('[REPO] Could not get portal id either from existing configuration or from user.');
+				return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+			}
 
-		const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
+			progress.report({
+				increment: 20,
+				message: 'Portal resolved: ' + this.portalName
+			});
 
-		for (const snippet of contentSnippets) {
-			result.data.contentSnippet.set(snippet.name, snippet);
-		}
+			const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+			const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
 
-		this.portalData = result;
-		return result;
+			progress.report({
+				increment: 20,
+				message: `Downloaded ${webTemplates.length} web templates`
+			});
+
+			for (const template of webTemplates) {
+				result.data.webTemplate.set(template.name, template);
+			}
+
+			const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
+			progress.report({
+				increment: 20,
+				message: `Downloaded ${contentSnippets.length} content snippets`
+			});
+
+			for (const snippet of contentSnippets) {
+				result.data.contentSnippet.set(snippet.name, snippet);
+			}
+
+
+			progress.report({
+				increment: 20,
+				message: `Downloaded ${0} files`
+			});
+
+			this.portalData = result;
+			return result;
+		});
 	}
 
 	private async choosePortal(): Promise<string | undefined> {
