@@ -110,7 +110,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			{
 				command: 'extension.source-control.checkout',
 				arguments: [this],
-				title: `↕ ${this.portalData.portalName}@${this.portalData.instanceName}`,
+				title: `🔗 ${this.portalData.portalName}@${this.portalData.instanceName}`,
 				tooltip: 'Checkout portal.',
 			},
 		];

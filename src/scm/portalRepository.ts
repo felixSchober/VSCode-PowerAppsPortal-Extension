@@ -89,13 +89,20 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	}
 
 	public async download(): Promise<PortalData> {
-		const portalId = await this.choosePortal();
-		const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-		if (!portalId) {
-			console.error('Could not get portal id.');
-			return result;
+		let portalId: string | undefined;
+		if (!this.configurationManager.isPortalDataConfigured) {
+			portalId = await this.choosePortal();
+		} else {
+			portalId = this.configurationManager.portalId;
+			this.portalName = this.configurationManager.portalName;
 		}
 
+		if (!portalId) {
+			console.error('[REPO] Could not get portal id either from existing configuration or from user.');
+			return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+		}
+
+		const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
 		const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
 
 		for (const template of webTemplates) {

@@ -5,13 +5,12 @@ import { ConfigurationManager } from './configuration/configurationManager';
 import { PowerAppsPortalDocumentContentProvider } from './scm/portalDocumentsContentProvider';
 import { PowerAppsPortalSourceControl } from './scm/portalSourceControl';
 import { POWERAPPSPORTAL_SCHEME } from './scm/portalRepository';
-import path = require('path');
 
 const SOURCE_CONTROL_OPEN_COMMAND = 'extension.source-control.open';
 let portalDocumentContentProvider: PowerAppsPortalDocumentContentProvider;
 const portalSourceControlRegister = new Map<vscode.Uri, PowerAppsPortalSourceControl>();
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 	// check if workspace folder is opened
 	let workspaceFolder: vscode.WorkspaceFolder;
 	try {
@@ -25,6 +24,22 @@ export function activate(context: vscode.ExtensionContext) {
 	const configurationManager = new ConfigurationManager(workspaceFolder);
 	portalDocumentContentProvider = new PowerAppsPortalDocumentContentProvider(workspaceFolder);
 
+	// Register commands and other interfaces
+	register(configurationManager, workspaceFolder, context);
+
+	// try to start extension from existing configuration
+	await initializeFolderFromConfiguration(configurationManager, workspaceFolder, context);
+}
+
+// this method is called when your extension is deactivated
+export function deactivate() {}
+
+function register(
+	configurationManager: ConfigurationManager,
+	workspaceFolder: vscode.WorkspaceFolder,
+	context: vscode.ExtensionContext
+) {
+	console.log('[START] Registering commands');
 	const configureExtensionCommand = vscode.commands.registerCommand(
 		'powerapps-portal-local-development.configureExtension',
 		async () => {
@@ -33,12 +48,16 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	context.subscriptions.push(configureExtensionCommand);
 
+	console.log('[START] Initializing portal document content provider');
 	context.subscriptions.push(
 		vscode.workspace.registerTextDocumentContentProvider(POWERAPPSPORTAL_SCHEME, portalDocumentContentProvider)
 	);
+
+	console.log('[START] Initializing workspace folder event listener');
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeWorkspaceFolders((e) => {
 			try {
+				console.log('[START] Workspace folder changed');
 				// initialize new source control for manually added workspace folders
 				e.added.forEach((wf) => {
 					initializeFolderFromConfiguration(configurationManager, wf, context);
@@ -55,28 +74,48 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 }
 
-// this method is called when your extension is deactivated
-export function deactivate() {}
-
 async function initializeFolderFromConfiguration(
 	configurationManager: ConfigurationManager,
-	folder: vscode.WorkspaceFolder,
+	workspaceFolder: vscode.WorkspaceFolder,
 	context: vscode.ExtensionContext
 ): Promise<void> {
+	console.log('[START] Try initializing folder from configuration');
 	await configurationManager.load(context);
-	const powerappsSourceControl = new PowerAppsPortalSourceControl(context, folder, configurationManager);
-	registerPowerAppsPortalSourceControl(powerappsSourceControl, context);
+
+	console.log(
+		`[START] Configuration\n\tInstance Status: ${
+			configurationManager.isConfigured ? 'Loaded' : 'Not loaded'
+		}\n\tPortal Status: ${configurationManager.isPortalDataConfigured ? 'Loaded' : 'Not loaded'}`
+	);
+	if (!configurationManager.isConfigured || !configurationManager.isPortalDataConfigured) {
+		console.log('[START] Could not load config. Manual config required.');
+		return;
+	}
+
+	let portalScm: PowerAppsPortalSourceControl;
+	try {
+		portalScm = await PowerAppsPortalSourceControl.getPortalScm(
+			context,
+			workspaceFolder,
+			configurationManager,
+			false
+		);
+	} catch (error) {
+		vscode.window.showErrorMessage(error);
+		return;
+	}
+	registerPowerAppsPortalSourceControl(portalScm, context);
 }
 
 function registerPowerAppsPortalSourceControl(
 	powerappsSourceControl: PowerAppsPortalSourceControl,
 	context: vscode.ExtensionContext
 ) {
-	// update the fiddle document content provider with the latest content
+	// update the portal document content provider with the latest content
 	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData());
 
-	// every time the repository is updated with new fiddle version, notify the content provider
-	powerappsSourceControl.onRepositoryChange((fiddle) => portalDocumentContentProvider.updated(fiddle));
+	// every time the repository is updated with new portalData version, notify the content provider
+	powerappsSourceControl.onRepositoryChange((portalData) => portalDocumentContentProvider.updated(portalData));
 
 	if (portalSourceControlRegister.has(powerappsSourceControl.getWorkspaceFolder().uri)) {
 		// the folder was already under source control

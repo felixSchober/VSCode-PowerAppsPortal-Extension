@@ -10,7 +10,8 @@
 		"SCM Providers"
 	],
 	"activationEvents": [
-		"onCommand:powerapps-portal-local-development.configureExtension"
+		"onCommand:powerapps-portal-local-development.configureExtension",
+		"workspaceContains:.portal"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
