@@ -1,6 +1,5 @@
 var dynamicsWebApi = require('dynamics-web-api');
 import { RetrieveMultipleRequest, RetrieveRequest } from 'dynamics-web-api';
-import { relative } from 'path';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
@@ -53,7 +52,7 @@ export class DynamicsApi {
 
 		const request: RetrieveMultipleRequest = {
 			select: ['adx_websiteid', 'adx_name'],
-			collection: 'adx_websites'
+			collection: 'adx_websites',
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365Website>(request);
 		if (!response.value) {
@@ -191,17 +190,17 @@ export class DynamicsApi {
 		const result: Array<ID365WebFile> = [];
 
 		for (const note of images) {
-			console.log(`\tCreating webfile ${note.filename}`);
+			console.log(`\t[D365 API] Creating webfile ${note.filename}`);
 			const file = await this.createWebFile(note.filename, websiteId, parentPageId, publishingStateId);
 
 			if (!file.adx_webfileid) {
-				throw Error(`Webfile for file ${note.filename} was not created successfully -> no id on obejct`);
+				throw Error(`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on obejct`);
 			}
 
-			console.log(`\tUploading contents to webfile ${note.filename}. File Id: ${file.adx_webfileid}`);
+			console.log(`\t[D365 API] Uploading contents to webfile ${note.filename}. File Id: ${file.adx_webfileid}`);
 			const createdNote = await this.createNote(note, file.adx_webfileid);
 
-			console.log('\tUploaded file: ' + createdNote.filename);
+			console.log('\t[D365 API] Uploaded file: ' + createdNote.filename);
 
 			result.push(file);
 		}
@@ -214,16 +213,16 @@ export class DynamicsApi {
 
 		for (const img of images) {
 			if (!img.annotationid) {
-				throw Error(`Could not update image with name: ${img.filename}. Existing id was undefined.`);
+				throw Error(`[D365 API] Could not update image with name: ${img.filename}. Existing id was undefined.`);
 			}
 
 			const updatedImage: any = {
 				documentbody: img.documentbody,
 			};
 
-			console.log(`\tUpdating image ${img.filename} to D365`);
+			console.log(`\t[D365 API] Updating image ${img.filename} to D365`);
 			await this.webApi.update<boolean>(img.annotationid, 'annotations', updatedImage);
-			console.log('\tUpdated file: ' + img.filename);
+			console.log('\t[D365 API] Updated file: ' + img.filename);
 			result.push(img);
 		}
 
@@ -245,7 +244,7 @@ export class DynamicsApi {
 			'adx_publishingstateid@odata.bind': `adx_publishingstates(${publishingStateId})`,
 		};
 
-		console.log(`Adding web file ${file.adx_name} to D365`);
+		console.log(`[D365 API] Adding web file ${file.adx_name} to D365`);
 		const requestResponse = await this.webApi.create<ID365WebFile>(
 			file,
 			'adx_webfiles',
@@ -265,7 +264,7 @@ export class DynamicsApi {
 			'objectid_adx_webfile@odata.bind': `adx_webfiles(${webfileId})`,
 		};
 
-		console.log(`Adding note ${noteToCreate.filename} to D365`);
+		console.log(`[D365 API] Adding note ${noteToCreate.filename} to D365`);
 		const requestResponse = await this.webApi.create<ID365Note>(
 			noteToCreate,
 			'annotations',
@@ -278,7 +277,7 @@ export class DynamicsApi {
 
 	private getAdalConnection(): CrmAdalConnectionSettings {
 		if (!this.configurationManager || !this.configurationManager.isConfigured) {
-			throw Error('Configuration was not done');
+			throw Error('[D365 API] Configuration was not done');
 		}
 
 		const adal = new CrmAdalConnectionSettings(this.configurationManager);

@@ -1,7 +1,12 @@
-import { ExtensionContext, workspace } from 'vscode';
+import { ExtensionContext, workspace, WorkspaceFolder } from 'vscode';
+import { IPortalConfigurationFile } from '../models/interfaces/portalConfigurationFile';
 import { CredentialManager } from './credentialManager';
 import { multiStepInput } from './quickInputConfigurator';
+import * as afs from '../scm/afs';
+import path = require('path');
 
+
+export const PORTAL_CONFIGURATION_FILE = ".portal";
 
 export class ConfigurationManager {
 
@@ -11,11 +16,18 @@ export class ConfigurationManager {
 	portalId: string | undefined;
 	portalName: string | undefined;
 
-	constructor() {
+	constructor(private readonly workspaceFolder: WorkspaceFolder) {
 	}
 
 	get isConfigured(): boolean {
 		if (this.d365InstanceName && this.d365CrmRegion && this.credentialManager?.isConfigured) {
+			return true;
+		}
+		return false;
+	}
+
+	get isPortalDataConfigured(): boolean {
+		if (this.portalId && this.portalName) {
 			return true;
 		}
 		return false;
@@ -26,11 +38,11 @@ export class ConfigurationManager {
 		try {
 			await this.loadConfiguration();
 		} catch (error) {
-			console.log('Could not get pre existing configuration from config store. Getting new values. Error: ' + error);
+			console.log('[CONFIG] Could not get pre existing configuration from config store. Getting new values. Error: ' + error);
 		}
 
 		if (this.isConfigured) {
-			console.log('Configuration successfully loaded from local store.');
+			console.log('[CONFIG] Configuration successfully loaded from local store.');
 			return;
 		}
 
@@ -50,15 +62,38 @@ export class ConfigurationManager {
 			aadTenantId = configuration.get<string>('aadTenantId');
 
 			if (!aadClientId || !aadTenantId) {
-				throw Error('Could not load either client id or tenant id from local config store.');
+				throw Error('[CONFIG] Could not load either client id or tenant id from local config store.');
 			}
 
 			this.credentialManager = new CredentialManager(aadTenantId, aadClientId);
 		} catch (error) {
-			throw Error('Could not load configuration form config file: ' + error);
+			throw Error('[CONFIG] Could not load configuration form config file: ' + error);
 		}
 		
 		await this.credentialManager.loadCredentials();
+
+		// try to also get the portal instance config from the configuration file
+		await this.loadPortalConfigurationFile();
+	}
+
+	private async loadPortalConfigurationFile() {
+		// Loads the portal configuration file that contains the id and name
+		const configFilePath = this.getConfigurationFilePath();
+		const configFileExists = await afs.exists(configFilePath);
+
+		if (configFileExists) {
+			const data = await afs.readFile(configFilePath);
+			const config: IPortalConfigurationFile = <IPortalConfigurationFile>JSON.parse(data.toString(afs.UTF8));
+			if (!config || !config.portalId || !config.portalName) {
+				console.warn(`[CONFIG] Portal config file exists but content is not valid: ${data.toString(afs.UTF8)}`);
+				return;
+			}
+
+			this.portalId = config.portalId;
+			this.portalName = config.portalName;
+
+			console.log(`[CONFIG] Restored portal name and id with config file.`);
+		}
 	}
 
 	private async configure(context: ExtensionContext) {
@@ -78,7 +113,7 @@ export class ConfigurationManager {
 		await this.storeConfiguration();
 	}
 
-	private async storeConfiguration() {
+	private async storeConfiguration(): Promise<void> {
 		if (!this.credentialManager || !this.credentialManager.isConfigured) {
 			throw Error('Could not store configuration because credential manager is not initialized or not configured');
 		}
@@ -92,5 +127,28 @@ export class ConfigurationManager {
 
 		await workspace.getConfiguration().update('powerappsPortals.dynamicsInstanceName', this.d365InstanceName);
 		await workspace.getConfiguration().update('powerappsPortals.dynamicsCrmRegion', this.d365CrmRegion);
+	}
+
+	async storeConfigurationFile(): Promise<void> {
+		if (!this.portalId || !this.portalName) {
+			console.error('Could not store configuration file because portalId or portalName are not set.');
+			return;
+		}
+
+		const config: IPortalConfigurationFile = {
+			portalId: this.portalId,
+			portalName: this.portalName
+		};
+		const configString = JSON.stringify(config);
+		const configFilePath = this.getConfigurationFilePath();
+		console.log(`[CONFIG] Save portal config file to ${configFilePath}`);
+		await afs.writeFile(
+			configFilePath,
+			Buffer.from(configString, afs.UTF8)
+		);
+	}
+
+	private getConfigurationFilePath(): string{
+		return path.join(this.workspaceFolder.uri.fsPath, PORTAL_CONFIGURATION_FILE);
 	}
 }

@@ -11,88 +11,72 @@ const SOURCE_CONTROL_OPEN_COMMAND = 'extension.source-control.open';
 let portalDocumentContentProvider: PowerAppsPortalDocumentContentProvider;
 const portalSourceControlRegister = new Map<vscode.Uri, PowerAppsPortalSourceControl>();
 
-
 export function activate(context: vscode.ExtensionContext) {
-
 	// check if workspace folder is opened
-	let workFolderPath: string;
+	let workspaceFolder: vscode.WorkspaceFolder;
 	try {
-		workFolderPath = getWorkspacePath();
+		workspaceFolder = getWorkspaceFolder();
 	} catch (error) {
 		vscode.window.showErrorMessage(`Please open a work folder first.`);
 		return;
 	}
 
-	const workspaceFolder = getWorkspaceFolder();
-
-	const configurationManager = new ConfigurationManager();
+	// initialize configuration manager
+	const configurationManager = new ConfigurationManager(workspaceFolder);
 	portalDocumentContentProvider = new PowerAppsPortalDocumentContentProvider(workspaceFolder);
 
 	const configureExtensionCommand = vscode.commands.registerCommand(
 		'powerapps-portal-local-development.configureExtension',
 		async () => {
-			await configureExtension(configurationManager, workFolderPath, workspaceFolder, context);
+			await configureExtension(configurationManager, workspaceFolder, context);
 		}
 	);
 	context.subscriptions.push(configureExtensionCommand);
 
-
-	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(POWERAPPSPORTAL_SCHEME, portalDocumentContentProvider));
-	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(e => {
-		try {
-			// initialize new source control for manually added workspace folders
-			e.added.forEach(wf => {
-				initializeFolderFromConfiguration(wf, context);
-			});
-		} catch (ex) {
-			vscode.window.showErrorMessage(ex.message);
-		} finally {
-			// dispose source control for removed workspace folders
-			e.removed.forEach(wf => {
-				unregisterPortalSourceControl(wf.uri);
-			});
-		}
-	}));
-
-	
-	
-	// let disposable = vscode.commands.registerCommand('powerapps-portal-local-development.helloWorld', () => {
-	// 	// The code you place here will be executed every time your command is executed
-
-	// 	// Display a message box to the user
-	// 	vscode.window.showInformationMessage('Hello World from PowerApps Portal Local Development!');
-
-	// 	const workspace = vscode.workspace;
-	// 	console.log(vscode.workspace.workspaceFile);
-	// });
-
-	// context.subscriptions.push(disposable);
-
-	// const d365SyncCommand = vscode.commands.registerCommand('powerapps-portal-local-development.syncD365Instance', async () => {
-	// 	await syncFromDynamicsInstance(d365Api);
-	// });
-
-	// context.subscriptions.push(d365SyncCommand);
+	context.subscriptions.push(
+		vscode.workspace.registerTextDocumentContentProvider(POWERAPPSPORTAL_SCHEME, portalDocumentContentProvider)
+	);
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeWorkspaceFolders((e) => {
+			try {
+				// initialize new source control for manually added workspace folders
+				e.added.forEach((wf) => {
+					initializeFolderFromConfiguration(configurationManager, wf, context);
+				});
+			} catch (ex) {
+				vscode.window.showErrorMessage(ex.message);
+			} finally {
+				// dispose source control for removed workspace folders
+				e.removed.forEach((wf) => {
+					unregisterPortalSourceControl(wf.uri);
+				});
+			}
+		})
+	);
 }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
 
-
-async function initializeFolderFromConfiguration(folder: vscode.WorkspaceFolder, context: vscode.ExtensionContext): Promise<void> {
-	
-	const configurationManager = new ConfigurationManager();
+async function initializeFolderFromConfiguration(
+	configurationManager: ConfigurationManager,
+	folder: vscode.WorkspaceFolder,
+	context: vscode.ExtensionContext
+): Promise<void> {
 	await configurationManager.load(context);
 	const powerappsSourceControl = new PowerAppsPortalSourceControl(context, folder, configurationManager);
 	registerPowerAppsPortalSourceControl(powerappsSourceControl, context);
 }
 
-function registerPowerAppsPortalSourceControl(powerappsSourceControl: PowerAppsPortalSourceControl, context: vscode.ExtensionContext) {
+function registerPowerAppsPortalSourceControl(
+	powerappsSourceControl: PowerAppsPortalSourceControl,
+	context: vscode.ExtensionContext
+) {
 	// update the fiddle document content provider with the latest content
 	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData());
 
 	// every time the repository is updated with new fiddle version, notify the content provider
-	powerappsSourceControl.onRepositoryChange(fiddle => portalDocumentContentProvider.updated(fiddle));
+	powerappsSourceControl.onRepositoryChange((fiddle) => portalDocumentContentProvider.updated(fiddle));
 
 	if (portalSourceControlRegister.has(powerappsSourceControl.getWorkspaceFolder().uri)) {
 		// the folder was already under source control
@@ -114,13 +98,14 @@ function unregisterPortalSourceControl(folderUri: vscode.Uri): void {
 	}
 }
 
-async function start(folder: vscode.WorkspaceFolder, context: vscode.ExtensionContext, configurationManager: ConfigurationManager) {
-	
-}
+async function start(
+	folder: vscode.WorkspaceFolder,
+	context: vscode.ExtensionContext,
+	configurationManager: ConfigurationManager
+) {}
 
 async function configureExtension(
 	configurationManager: ConfigurationManager,
-	workFolderPath: string,
 	workspaceFolder: vscode.WorkspaceFolder,
 	context: vscode.ExtensionContext
 ) {
@@ -136,18 +121,27 @@ async function configureExtension(
 		vscode.window.showErrorMessage('Could not load configuration. Please try again.');
 	}
 
+	// only overwrite data if new instance which hasn't been configured before
+	const overwriteData = configurationManager.isPortalDataConfigured;
+
 	// register source control
-	const portalScm = await PowerAppsPortalSourceControl.getPortalScm(context, workspaceFolder, configurationManager);
+	let portalScm: PowerAppsPortalSourceControl;
+	try {
+		portalScm = await PowerAppsPortalSourceControl.getPortalScm(
+			context,
+			workspaceFolder,
+			configurationManager,
+			overwriteData
+		);
+	} catch (error) {
+		vscode.window.showErrorMessage(error);
+		return;
+	}
+
 	registerPowerAppsPortalSourceControl(portalScm, context);
 
-	
 	// show the file explorer with the three new files
-	vscode.commands.executeCommand("workbench.view.explorer");
-
-}
-
-function getWorkspacePath(): string {
-	return getWorkspaceFolder().uri.fsPath;
+	vscode.commands.executeCommand('workbench.view.explorer');
 }
 
 function getWorkspaceFolder(): vscode.WorkspaceFolder {

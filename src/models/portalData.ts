@@ -1,15 +1,13 @@
-import { Uri } from "vscode";
-import { getFilename, getFileType } from "../scm/portalSourceControl";
-import { ContentSnippet } from "./ContentSnippet";
-import { WebFile } from "./WebFile";
-import { WebTemplate } from "./WebTemplate";
+import { Uri } from 'vscode';
+import { getFilename, getFileType } from '../scm/portalSourceControl';
+import { ContentSnippet } from './ContentSnippet';
+import { WebFile } from './WebFile';
+import { WebTemplate } from './WebTemplate';
 
 export class PortalData {
-
 	public instanceName: string;
 	public portalName: string;
 	public data: IPortalDocuments;
-
 
 	constructor(instanceName: string, portalName: string) {
 		this.instanceName = instanceName;
@@ -17,7 +15,7 @@ export class PortalData {
 		this.data = {
 			contentSnippet: new Map<string, ContentSnippet>(),
 			webFile: new Map<string, WebFile>(),
-			webTemplate: new Map<string, WebTemplate>()
+			webTemplate: new Map<string, WebTemplate>(),
 		};
 	}
 
@@ -46,5 +44,5 @@ export interface IPortalDocuments {
 export enum PortalFileType {
 	contentSnippet,
 	webFile,
-	webTemplate
+	webTemplate,
 }

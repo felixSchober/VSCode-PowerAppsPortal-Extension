@@ -1,8 +1,16 @@
-import { CancellationToken, ExtensionContext, ProviderResult, QuickDiffProvider, Uri, window, workspace, WorkspaceFolder } from "vscode";
+import {
+	CancellationToken,
+	ProviderResult,
+	QuickDiffProvider,
+	Uri,
+	window,
+	workspace,
+	WorkspaceFolder,
+} from 'vscode';
 import * as path from 'path';
-import { ConfigurationManager } from "../configuration/configurationManager";
-import { PortalData, PortalFileType } from "../models/portalData";
-import { DynamicsApi } from "../api/dynamicsApi";
+import { ConfigurationManager } from '../configuration/configurationManager';
+import { PortalData, PortalFileType } from '../models/portalData';
+import { DynamicsApi } from '../api/dynamicsApi';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -10,8 +18,7 @@ export const FOLDER_TEMPLATES = 'Web Templates';
 export const FOLDER_WEB_FILES = 'Web Files';
 
 export class PowerAppsPortalRepository implements QuickDiffProvider {
-
-	private workspaceFolder: WorkspaceFolder; 
+	private workspaceFolder: WorkspaceFolder;
 	private configurationManager: ConfigurationManager;
 	private d365WebApi: DynamicsApi;
 	public portalName: string | undefined;
@@ -53,7 +60,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	}
 
 	/**
-	 * Creates a local file path in the local workspace that corresponds to the part of the 
+	 * Creates a local file path in the local workspace that corresponds to the part of the
 	 * fiddle denoted by the given extension.
 	 *
 	 * @param extension fiddle part, which is also used as a file extension
@@ -74,14 +81,14 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			case PortalFileType.webTemplate:
 				fileTypePath = FOLDER_TEMPLATES;
 				break;
-		
+
 			default:
 				break;
 		}
 		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName + '.html');
 	}
 
-	public async download(): Promise<PortalData>{
+	public async download(): Promise<PortalData> {
 		const portalId = await this.choosePortal();
 		const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
 		if (!portalId) {
@@ -107,7 +114,10 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 	private async choosePortal(): Promise<string | undefined> {
 		const portals = await this.d365WebApi.getPortals();
-		const portalChoice = await window.showQuickPick(new Array(...portals.keys()), { placeHolder: 'Select Portal', ignoreFocusOut: true});
+		const portalChoice = await window.showQuickPick(new Array(...portals.keys()), {
+			placeHolder: 'Select Portal',
+			ignoreFocusOut: true,
+		});
 
 		if (!portalChoice) {
 			return;

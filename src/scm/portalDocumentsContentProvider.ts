@@ -31,11 +31,9 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 	}
 
 	updated(updatedPortalData: PortalData): void {
-
 		for (const updatedDocument of updatedPortalData.data.webTemplate.values()) {
 			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES, updatedDocument.name + '.html');
 			this._onDidChange.fire(Uri.parse(fn));
-
 		}
 
 		this.portalData = updatedPortalData;

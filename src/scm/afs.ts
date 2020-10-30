@@ -3,6 +3,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+export const UTF8 = 'utf8';
 
 function handleResult<T>(resolve: (result: T) => void, reject: (error: Error) => void, error: Error | null | undefined, result: T): void {
 	if (error) {
@@ -11,7 +12,6 @@ function handleResult<T>(resolve: (result: T) => void, reject: (error: Error) =>
 		resolve(result);
 	}
 }
-
 
 function massageError(error: Error & { code?: string }): Error {
 	if (error.code === 'ENOENT') {

@@ -15,7 +15,7 @@ export class CrmAdalConnectionSettings {
 
 	constructor(configurationManager: ConfigurationManager) {
 		if (!configurationManager.isConfigured) {
-			throw new Error('Configuration Manager is not configured.');
+			throw new Error('[AUTH] Configuration Manager is not configured.');
 		}
 		const creds = configurationManager.credentialManager?.getCredentials();
 
@@ -35,22 +35,22 @@ export class CrmAdalConnectionSettings {
 		const adalTokenAquiredCallback = (error: Error, response: TokenResponse | ErrorResponse) => {
 			if (error) {
 				const errorMessage = `Could not authenticate with provided credentials. \nError Details:\n\tMessage: ${error.message}\n\tStack: ${error.stack}`;
-				console.error(errorMessage);
+				console.error('[AUTH] ' + errorMessage);
 				return;
 			}
 
 			// authentication successful
-			console.log('Authentication was sucessful.');
+			console.log('[AUTH] Authentication was successful.');
 			callback(response);
 		};
 
-		console.log('Beginning authentication with provided clientId and clientSecret.');
+		console.log('[AUTH] Beginning authentication with provided clientId and clientSecret.');
 		this.adalContext.acquireTokenWithClientCredentials(
 			this.resourceUrl,
 			this.aadClientId,
 			this.aadClientSecret,
 			adalTokenAquiredCallback
 		);
-		console.log('Authentication prepared.');
+		console.log('[AUTH] Authentication prepared.');
 	}
 }

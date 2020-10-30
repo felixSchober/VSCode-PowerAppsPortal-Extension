@@ -24,8 +24,8 @@ import {
 	PowerAppsPortalRepository,
 } from './portalRepository';
 import { PortalData, PortalFileType } from '../models/portalData';
-import path = require('path');
 import { Utils } from '../utils';
+import path = require('path');
 
 export class PowerAppsPortalSourceControl implements Disposable {
 	private portalScm: SourceControl;
@@ -57,22 +57,40 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	public static async getPortalScm(
 		context: ExtensionContext,
 		workspaceFolder: WorkspaceFolder,
-		configurationManager: ConfigurationManager
-	) {
+		configurationManager: ConfigurationManager,
+		overwrite: boolean
+	): Promise<PowerAppsPortalSourceControl> {
 		const portalScm = new PowerAppsPortalSourceControl(context, workspaceFolder, configurationManager);
-		console.log('Downloading portal data');
-		const portalData = await portalScm.portalRepository.download();
-		console.log('Portal Data downloaded');
+
+		console.log('[SCM] Downloading portal data');
+		let portalData: PortalData;
+
+		try {
+			portalData = await portalScm.portalRepository.download();
+		} catch (error) {
+			throw new Error(`[SCM] Could not download portal data: ${error}`);
+		}
+
+		console.log('[SCM] Portal Data downloaded');
+
+		// save chosen portal id and name to config file so that the user doesn't need to
+		// specify the portal again
+		// also, this helps activating the extension on future runs.
+		configurationManager.portalId = portalScm.portalRepository.portalId;
+		configurationManager.portalName = portalScm.portalRepository.portalName;
+		await configurationManager.storeConfigurationFile();
+
 		portalScm.portalData = portalData;
+
 		// clone portal to the local workspace
-		portalScm.setPortalData(portalData, true);
+		portalScm.setPortalData(portalData, overwrite);
 		return portalScm;
 	}
 
 	private registerFileSystemWatcher(context: ExtensionContext, workspaceFolder: WorkspaceFolder) {
 		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, '**/*.*'));
 		fileSystemWatcher.onDidChange((uri) => {
-			console.log("File change");
+			console.log('[SCM] File change');
 			this.onResourceChange(uri);
 		}, context.subscriptions);
 		fileSystemWatcher.onDidCreate((uri) => this.onResourceChange(uri), context.subscriptions);
@@ -100,9 +118,9 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 	async commitAll(): Promise<void> {
 		if (!this.changedResources.resourceStates.length) {
-			window.showErrorMessage('There is nothing to commit.');
+			window.showErrorMessage('[SCM] There is nothing to commit.');
 		} else {
-			console.log('Commit data');
+			console.log('[SCM] Commit data');
 			// const html = await this.getLocalResourceText('html');
 			// const js = await this.getLocalResourceText('js');
 			// const css = await this.getLocalResourceText('css');
@@ -176,6 +194,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		} else {
 			try {
 				const newPortalData = await this.portalRepository.download();
+
+				// force set data (overwrite = true)
 				this.setPortalData(newPortalData, true);
 			} catch (ex) {
 				window.showErrorMessage(ex);
@@ -184,10 +204,19 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	private setPortalData(newPortalData: PortalData, overwrite: boolean) {
+		console.log(`[SCM] Setting portal data. Overwrite: ${overwrite}.\n[SCM] =========================================`);
+		console.log(`\tOld Snippets: ${this.portalData?.data.contentSnippet.size}.`);
+		console.log(`\tNew Snippets: ${newPortalData.data.contentSnippet.size}.`);
+		console.log(`\tOld Templates: ${this.portalData?.data.webTemplate.size}.`);
+		console.log(`\tNew Templates: ${newPortalData.data.webTemplate.size}.`);
+		console.log(`\tOld Files: ${this.portalData?.data.webFile.size}.`);
+		console.log(`\tNew Files: ${newPortalData.data.webFile.size}.`);
+
 		this.portalData = newPortalData;
 		if (overwrite) {
+			// overwrite local file content
 			this.resetFilesToCheckedOutVersion();
-		} // overwrite local file content
+		}
 		this._onRepositoryChange.fire(this.portalData);
 		this.refreshStatusBar();
 	}
@@ -259,7 +288,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// if (!originalText) {
 		// 	return true;
 		// }
-		const isDirty = originalText.replace(/\n/g, '').replace(/\r/g, '') !== doc.getText().replace(/\n/g, '').replace(/\r/g, '');
+		const isDirty =
+			originalText.replace(/\n/g, '').replace(/\r/g, '') !== doc.getText().replace(/\n/g, '').replace(/\r/g, '');
 		return isDirty;
 	}
 
@@ -322,6 +352,6 @@ export function getFileType(uri: Uri): PortalFileType {
 		case FOLDER_WEB_FILES:
 			return PortalFileType.webFile;
 		default:
-			throw Error(`Unknown portal file type: ${fileFolder}.`);
+			throw Error(`[SCM] Unknown portal file type: ${fileFolder}.`);
 	}
 }
