@@ -34,8 +34,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private _onRepositoryChange = new EventEmitter<PortalData>();
 	private timeout?: NodeJS.Timer;
 	private portalData!: PortalData;
-	private changedGroup: Uri[] = [];
-	private changedResourceStates: SourceControlResourceState[] = [];
+	private changedGroup: Set<Uri> = new Set<Uri>();
+	private changedResourceStates: Map<string, SourceControlResourceState> = new Map<string, SourceControlResourceState>();
 
 	constructor(
 		context: ExtensionContext,
@@ -230,7 +230,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		}
 
 		// initially, mark all files as changed
-		this.changedGroup = this.portalRepository.provideSourceControlledResources();
+		this.changedGroup = new Set<Uri>(this.portalRepository.provideSourceControlledResources());
 
 
 		this._onRepositoryChange.fire(this.portalData);
@@ -254,12 +254,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		if (this.timeout) {
 			clearTimeout(this.timeout);
 		}
-		this.changedGroup.push(_uri);
+		this.changedGroup.add(_uri);
 		this.timeout = setTimeout(() => this.tryUpdateChangedGroup(), 500);
 	}
 
 	async tryUpdateChangedGroup(): Promise<void> {
-		console.log(`[SCM] Update ${this.changedGroup.length} files.`);
+		console.log(`[SCM] Update ${this.changedGroup.size} files.`);
 		try {
 			await this.updateChangedGroup();
 		} catch (ex) {
@@ -273,7 +273,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		
 
 		const uris = this.changedGroup;
-		this.changedGroup = [];
+		this.changedGroup = new Set<Uri>();
 
 		for (const uri of uris) {
 			let isDirty: boolean;
@@ -300,11 +300,19 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 			if (isDirty) {
 				const resourceState = this.toSourceControlResourceState(uri, wasDeleted);
-				this.changedResourceStates.push(resourceState);
+
+				// use a map to prevent duplicate change entriees
+				this.changedResourceStates.set(uri.fsPath, resourceState);
+			} else {
+				// uri is not dirty. check if it is in changedresouce state (could have been previously changed but then changed back)
+				if (this.changedResourceStates.has(uri.fsPath)) {
+					console.log(`[SCM]\t${uri} no longer dirty`);
+					this.changedResourceStates.delete(uri.fsPath);
+				}
 			}
 		}
 
-		this.changedResources.resourceStates = this.changedResourceStates;
+		this.changedResources.resourceStates = [...this.changedResourceStates.values()];
 
 		// the number of modified resources needs to be assigned to the SourceControl.count filed to let VS Code show the number.
 		this.portalScm.count = this.changedResources.resourceStates.length;
