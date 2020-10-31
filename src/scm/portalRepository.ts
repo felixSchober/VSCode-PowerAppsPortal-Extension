@@ -192,6 +192,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			});
 		} catch (error) {
 			window.showErrorMessage('Could not download data: ' + error);
+			throw new Error(error);
 		}
 	}
 
