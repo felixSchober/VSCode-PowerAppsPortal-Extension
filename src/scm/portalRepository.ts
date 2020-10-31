@@ -116,78 +116,83 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			title: 'Downloading data from Dynamics',
 			cancellable: true
 		};
-		return window.withProgress(progressOptions, async (progress, token) => {
-			token.onCancellationRequested(() => {
-				console.log("User canceled the long running operation");
-				return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+
+		try {
+			return window.withProgress(progressOptions, async (progress, token) => {
+				token.onCancellationRequested(() => {
+					console.log("User canceled the long running operation");
+					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+				});
+	
+				let progressMessage = `Downloading data`;
+				progress.report({
+					message: progressMessage
+				});
+	
+				let portalId: string | undefined;
+				if (!this.configurationManager.isPortalDataConfigured) {
+					portalId = await this.choosePortal();
+				} else {
+					portalId = this.configurationManager.portalId;
+					this.portalName = this.configurationManager.portalName;
+				}
+	
+	
+				if (!portalId) {
+					console.error('[REPO] Could not get portal id either from existing configuration or from user.');
+					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+				}
+	
+				progressMessage += `\n\tPortal resolved: ${this.portalName}`;
+				progress.report({
+					increment: 25,
+					message: progressMessage + `\n\t… Templates`
+				});
+	
+				const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+				const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
+	
+				progressMessage += `\n\t✓ Templates: ${webTemplates.length}`;
+				progress.report({
+					increment: 25,
+					message: progressMessage + `\n\t… Content Snippets`
+				});
+	
+				for (const template of webTemplates) {
+					result.data.webTemplate.set(template.name, template);
+				}
+	
+				const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
+				
+				progressMessage += `\n\t✓ Content Snippets: ${webTemplates.length}`;
+				progress.report({
+					increment: 25,
+					message: progressMessage + `\n\t… Files`
+				});
+	
+				for (const snippet of contentSnippets) {
+					result.data.contentSnippet.set(snippet.name, snippet);
+				}
+	
+				const webFiles = await this.d365WebApi.getWebFiles(portalId);
+				for (const file of webFiles) {
+					result.data.webFile.set(file.d365Note.filename, file);
+				}
+	
+				progressMessage += `\n\t✓ Files: ${webTemplates.length}`;
+				progress.report({
+					increment: 25,
+					message: progressMessage
+				});
+	
+				window.showInformationMessage(progressMessage);
+	
+				this.portalData = result;
+				return result;
 			});
-
-			let progressMessage = `Downloading data`;
-			progress.report({
-				message: progressMessage
-			});
-
-			let portalId: string | undefined;
-			if (!this.configurationManager.isPortalDataConfigured) {
-				portalId = await this.choosePortal();
-			} else {
-				portalId = this.configurationManager.portalId;
-				this.portalName = this.configurationManager.portalName;
-			}
-
-
-			if (!portalId) {
-				console.error('[REPO] Could not get portal id either from existing configuration or from user.');
-				return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-			}
-
-			progressMessage += `\n\tPortal resolved: ${this.portalName}`;
-			progress.report({
-				increment: 25,
-				message: progressMessage + `\n\t… Templates`
-			});
-
-			const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-			const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
-
-			progressMessage += `\n\t✓ Templates: ${webTemplates.length}`;
-			progress.report({
-				increment: 25,
-				message: progressMessage + `\n\t… Content Snippets`
-			});
-
-			for (const template of webTemplates) {
-				result.data.webTemplate.set(template.name, template);
-			}
-
-			const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
-			
-			progressMessage += `\n\t✓ Content Snippets: ${webTemplates.length}`;
-			progress.report({
-				increment: 25,
-				message: progressMessage + `\n\t… Files`
-			});
-
-			for (const snippet of contentSnippets) {
-				result.data.contentSnippet.set(snippet.name, snippet);
-			}
-
-			const webFiles = await this.d365WebApi.getWebFiles(portalId);
-			for (const file of webFiles) {
-				result.data.webFile.set(file.d365Note.filename, file);
-			}
-
-			progressMessage += `\n\t✓ Files: ${webTemplates.length}`;
-			progress.report({
-				increment: 25,
-				message: progressMessage
-			});
-
-			window.showInformationMessage(progressMessage);
-
-			this.portalData = result;
-			return result;
-		});
+		} catch (error) {
+			window.showErrorMessage('Could not download data: ' + error);
+		}
 	}
 
 	private async choosePortal(): Promise<string | undefined> {
