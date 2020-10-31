@@ -151,7 +151,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	/**
 	 * Throws away all local changes and resets all files to the checked out version of the repository.
 	 */
-	resetFilesToCheckedOutVersion(): void {
+	async resetFilesToCheckedOutVersion(): Promise<void> {
 		// create folder structure
 		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_CONTENT_SNIPPETS));
 		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES));
@@ -168,6 +168,21 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		for (const webFile of this.portalData.data.webFile.values()) {
 			this.resetFile(webFile.d365Note.filename, PortalFileType.webFile);
 		}
+
+		// delete new existing non-tracked files
+		if (this.changedResourceStates.size > 0) {
+			console.log(`[SCM] found ${this.changedResourceStates.size} untracked new files to reset.`);
+			for (const f of this.changedResourceStates.values()) {
+				// don't delete file if the file is tracked
+				if (this.portalData.fileExists(f.resourceUri)) {
+					continue;
+				}
+				console.log(`[SCM] Deleting ${f.resourceUri}.`);
+				await afs.unlink(f.resourceUri.fsPath);
+			}
+		}
+
+		this.changedResourceStates.clear();
 	}
 
 	/** Resets the given local file content to the checked-out version. */
@@ -214,6 +229,15 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				window.showErrorMessage(ex);
 			}
 		}
+	}
+
+	/**
+	 * Refresh is used when the information on the server may have changed.
+	 * For example another user updates the Fiddle online.
+	 */
+	async refresh(): Promise<void> {
+		const latestPortalData = await this.portalRepository.download();
+		this.setPortalData(latestPortalData, false);
 	}
 
 	private async setPortalData(newPortalData: PortalData, overwrite: boolean) {

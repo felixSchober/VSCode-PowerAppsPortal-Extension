@@ -18,7 +18,7 @@
 		"commands": [
 			{
 				"command": "powerapps-portal-local-development.source-control.commit",
-				"title": "Commit local changes to JS Fiddle",
+				"title": "Commit local changes to Portal",
 				"icon": {
 					"light": "resources/icons/light/check.svg",
 					"dark": "resources/icons/dark/check.svg"
@@ -26,7 +26,7 @@
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.refresh",
-				"title": "Refresh JS Fiddle status",
+				"title": "Refresh Portal data",
 				"icon": {
 					"light": "resources/icons/light/refresh.svg",
 					"dark": "resources/icons/dark/refresh.svg"
@@ -34,7 +34,7 @@
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.discard",
-				"title": "Discards local changes to JS Fiddle",
+				"title": "Discards local changes",
 				"icon": {
 					"light": "resources/icons/light/discard.svg",
 					"dark": "resources/icons/dark/discard.svg"
@@ -42,15 +42,11 @@
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.checkout",
-				"title": "Checkout another version of this Fiddle",
+				"title": "Checkout",
 				"icon": {
 					"light": "resources/icons/light/refresh.svg",
 					"dark": "resources/icons/dark/refresh.svg"
 				}
-			},
-			{
-				"command": "powerapps-portal-local-development.source-control.browse",
-				"title": "Open current Fiddle in the default browser"
 			},
 			{
 				"command": "powerapps-portal-local-development.configureExtension",
@@ -122,10 +118,6 @@
 				{
 					"command": "powerapps-portal-local-development.source-control.refresh",
 					"group": "navigation",
-					"when": "scmProvider == powerappsPortal"
-				},
-				{
-					"command": "powerapps-portal-local-development.source-control.browse",
 					"when": "scmProvider == powerappsPortal"
 				}
 			]

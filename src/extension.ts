@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { DynamicsApi } from './api/dynamicsApi';
-import { Utils } from './utils';
 import { ConfigurationManager } from './configuration/configurationManager';
 import { PowerAppsPortalDocumentContentProvider } from './scm/portalDocumentsContentProvider';
 import { PowerAppsPortalSourceControl } from './scm/portalSourceControl';
-import { POWERAPPSPORTAL_SCHEME } from './scm/portalRepository';
+import { PowerAppsPortalRepository, POWERAPPSPORTAL_SCHEME } from './scm/portalRepository';
+import { RepositoryPick } from './scm/repositoryPick';
+import { Utils } from './utils';
 
 const SOURCE_CONTROL_OPEN_COMMAND = 'extension.source-control.open';
 let portalDocumentContentProvider: PowerAppsPortalDocumentContentProvider;
@@ -13,12 +13,8 @@ const portalSourceControlRegister = new Map<vscode.Uri, PowerAppsPortalSourceCon
 export async function activate(context: vscode.ExtensionContext) {
 	// check if workspace folder is opened
 	let workspaceFolder: vscode.WorkspaceFolder;
-	try {
-		workspaceFolder = getWorkspaceFolder();
-	} catch (error) {
-		vscode.window.showErrorMessage(`Please open a work folder first.`);
-		return;
-	}
+	workspaceFolder = await getWorkspaceFolder();
+
 
 	// initialize configuration manager
 	const configurationManager = new ConfigurationManager(workspaceFolder);
@@ -43,10 +39,35 @@ function register(
 	const configureExtensionCommand = vscode.commands.registerCommand(
 		'powerapps-portal-local-development.configureExtension',
 		async () => {
+			if (!workspaceFolder) {
+				workspaceFolder = await getWorkspaceFolder();
+			}
 			await configureExtension(configurationManager, workspaceFolder, context);
 		}
 	);
 	context.subscriptions.push(configureExtensionCommand);
+
+	context.subscriptions.push(vscode.commands.registerCommand("powerapps-portal-local-development.source-control.refresh",
+		async (sourceControlPane: vscode.SourceControl) => {
+			const sourceControl = await pickSourceControl(sourceControlPane);
+			if (sourceControl) { sourceControl.refresh(); }
+		}));
+	context.subscriptions.push(vscode.commands.registerCommand("powerapps-portal-local-development.source-control.discard",
+		async (sourceControlPane: vscode.SourceControl) => {
+			const sourceControl = await pickSourceControl(sourceControlPane);
+			if (sourceControl) { sourceControl.resetFilesToCheckedOutVersion(); }
+		}));
+	context.subscriptions.push(vscode.commands.registerCommand("powerapps-portal-local-development.source-control.commit",
+		async (sourceControlPane: vscode.SourceControl) => {
+			const sourceControl = await pickSourceControl(sourceControlPane);
+			if (sourceControl) { sourceControl.commitAll(); }
+		}));
+	context.subscriptions.push(vscode.commands.registerCommand("powerapps-portal-local-development.source-control.checkout",
+		async (sourceControl: PowerAppsPortalSourceControl, newVersion?: number) => {
+			sourceControl = sourceControl || await pickSourceControl(null);
+			if (sourceControl) { sourceControl.tryCheckout(); }
+		}));
+
 
 	console.log('[START] Initializing portal document content provider');
 	context.subscriptions.push(
@@ -72,6 +93,39 @@ function register(
 			}
 		})
 	);
+}
+
+async function pickSourceControl(sourceControlPane: vscode.SourceControl | null): Promise<PowerAppsPortalSourceControl | undefined> {
+	
+	if (sourceControlPane && sourceControlPane !== null) {
+		if (!sourceControlPane.rootUri) {
+			return;
+		}
+		return portalSourceControlRegister.get(sourceControlPane.rootUri);
+	}
+
+	// todo: when/if the SourceControl exposes a 'selected' property, use that instead
+
+	if (portalSourceControlRegister.size === 0) { return undefined; }
+	else if (portalSourceControlRegister.size === 1) { return [...portalSourceControlRegister.values()][0]; }
+	else {
+
+		const picks = [...portalSourceControlRegister.values()].map(fsc => new RepositoryPick(fsc));
+
+		if (vscode.window.activeTextEditor) {
+			const activeWorkspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri);
+			const activeSourceControl = activeWorkspaceFolder && portalSourceControlRegister.get(activeWorkspaceFolder.uri);
+			const activeIndex = Utils.firstIndex(picks, pick => pick.fiddleSourceControl === activeSourceControl);
+
+			// if there is an active editor, move its folder to be the first in the pick list
+			if (activeIndex > -1) {
+				picks.unshift(...picks.splice(activeIndex, 1));
+			}
+		}
+
+		const pick = await vscode.window.showQuickPick(picks, { placeHolder: 'Select repository' });
+		return pick && pick.fiddleSourceControl;
+	}
 }
 
 async function initializeFolderFromConfiguration(
@@ -183,11 +237,36 @@ async function configureExtension(
 	vscode.commands.executeCommand('workbench.view.explorer');
 }
 
-function getWorkspaceFolder(): vscode.WorkspaceFolder {
+async function getWorkspaceFolder(): Promise<vscode.WorkspaceFolder> {
 	const ws = vscode.workspace.workspaceFolders || [];
 	if (ws.length === 0) {
-		throw new Error('There is no open folder in visual studio code.');
+		await chooseWorkspaceFolder();
+		console.log(vscode.workspace.workspaceFolders?.length);
+	}
+	return ws[0];
+}
+
+async function chooseWorkspaceFolder() {
+
+	const openNewWindowOptions = ['Open in current window', 'Open new window'];
+	const openNewFolder = await vscode.window.showQuickPick(openNewWindowOptions, {
+		placeHolder: 'Open folder in current window or a new window?',
+		ignoreFocusOut: true
+	});
+	const useSameWindow = openNewFolder === openNewWindowOptions[0];
+
+	const folders = await vscode.window.showOpenDialog({
+		canSelectFiles: false,
+		canSelectFolders: true,
+		canSelectMany: false,
+		title: 'Select folder location'
+	});
+
+	if (!folders || folders.length === 0) {
+		vscode.window.showErrorMessage('Please pick a folder');
+		return;
 	}
 
-	return ws[0];
+	const test = await vscode.commands.executeCommand('vscode.openFolder', folders[0], useSameWindow);
+	console.log(test);
 }
