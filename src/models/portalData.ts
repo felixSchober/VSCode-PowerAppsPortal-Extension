@@ -20,6 +20,23 @@ export class PortalData {
 		};
 	}
 
+	public fileExists(uri: Uri): boolean {
+		const fileType = getFileType(uri);
+		let fileName = getFilename(uri, fileType);
+
+		switch (fileType) {
+			case PortalFileType.contentSnippet:
+				fileName = fileName.replace(/_/g, '/');
+				return this.data.contentSnippet.has(fileName);
+			case PortalFileType.webTemplate:
+				return this.data.webTemplate.has(fileName);
+			case PortalFileType.webFile:
+				return this.data.webFile.has(fileName);
+			default:
+				return false;
+		}
+	}
+
 	public getDocumentContent(uri: Uri, fileAsBase64: boolean = false): string {
 		const fileType = getFileType(uri);
 		let fileName = getFilename(uri, fileType);
@@ -54,4 +71,5 @@ export enum PortalFileType {
 	contentSnippet,
 	webFile,
 	webTemplate,
+	other
 }

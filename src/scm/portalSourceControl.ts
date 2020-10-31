@@ -4,6 +4,7 @@ import {
 	Event,
 	EventEmitter,
 	ExtensionContext,
+	ProgressLocation,
 	RelativePattern,
 	scm,
 	SourceControl,
@@ -26,6 +27,7 @@ import {
 import { PortalData, PortalFileType } from '../models/portalData';
 import { Utils } from '../utils';
 import path = require('path');
+import { ALL_FILES_GLOB } from './afs';
 
 export class PowerAppsPortalSourceControl implements Disposable {
 	private portalScm: SourceControl;
@@ -90,7 +92,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	private registerFileSystemWatcher(context: ExtensionContext, workspaceFolder: WorkspaceFolder) {
-		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, '**/*.*'));
+		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, ALL_FILES_GLOB));
 		fileSystemWatcher.onDidChange((uri) => {
 			this.onResourceChange(uri);
 		}, context.subscriptions);
@@ -230,7 +232,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		}
 
 		// initially, mark all files as changed
-		this.changedGroup = new Set<Uri>(this.portalRepository.provideSourceControlledResources());
+		this.changedGroup = await this.portalRepository.provideSourceControlledResources();
 
 
 		this._onRepositoryChange.fire(this.portalData);
@@ -275,41 +277,64 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		const uris = this.changedGroup;
 		this.changedGroup = new Set<Uri>();
 
-		for (const uri of uris) {
-			let isDirty: boolean;
-			let wasDeleted: boolean;
+		try {
+			await window.withProgress({location: ProgressLocation.SourceControl}, async () => {
 
-			const pathExists = await afs.exists(uri.fsPath);
+				for (const uri of uris) {
 
-			if (pathExists) {
-				let document: TextDocument;
-				try {
-					document = await workspace.openTextDocument(uri);
-					isDirty = this.isDirty(document);
-				} catch (error) {
-					const fileBuffer = await afs.readFile(uri.fsPath);
-					const encodedFile = fileBuffer.toString(afs.BASE64);
-					isDirty = this.isDirtyBase64(uri, encodedFile);
+					// if the current file is not a "portal file" ignore it
+					if (getFileType(uri) === PortalFileType.other) {
+						continue;
+					}
+
+					let isDirty: boolean;
+					let wasDeleted: boolean;
+		
+					const pathExists = await afs.exists(uri.fsPath);
+		
+					if (pathExists) {
+						let document: TextDocument;
+						try {
+							document = await workspace.openTextDocument(uri);
+							isDirty = this.isDirty(document);
+						} catch (error) {
+							const fileBuffer = await afs.readFile(uri.fsPath);
+							const encodedFile = fileBuffer.toString(afs.BASE64);
+							isDirty = this.isDirtyBase64(uri, encodedFile);
+						}
+						
+						wasDeleted = false;
+					} else {
+						// does the file exist in the repo? 
+						// if it doesn't then we can remove it from scm directly
+						const fileExistsInPortalData = this.portalData.fileExists(uri);
+						if (!fileExistsInPortalData) {
+							console.log('[SCM] File was deleted but is not tracked for portal.');
+							isDirty = false;
+							wasDeleted = true;
+						} else {
+							isDirty = true;
+							wasDeleted = true;
+						}
+					}
+		
+					if (isDirty) {
+						const resourceState = this.toSourceControlResourceState(uri, wasDeleted);
+		
+						// use a map to prevent duplicate change entriees
+						this.changedResourceStates.set(uri.fsPath, resourceState);
+					} else {
+						// uri is not dirty. check if it is in changedresouce state (could have been previously changed but then changed back)
+						if (this.changedResourceStates.has(uri.fsPath)) {
+							console.log(`[SCM]\t${uri} no longer dirty`);
+							this.changedResourceStates.delete(uri.fsPath);
+						}
+					}
 				}
-				
-				wasDeleted = false;
-			} else {
-				isDirty = true;
-				wasDeleted = true;
-			}
-
-			if (isDirty) {
-				const resourceState = this.toSourceControlResourceState(uri, wasDeleted);
-
-				// use a map to prevent duplicate change entriees
-				this.changedResourceStates.set(uri.fsPath, resourceState);
-			} else {
-				// uri is not dirty. check if it is in changedresouce state (could have been previously changed but then changed back)
-				if (this.changedResourceStates.has(uri.fsPath)) {
-					console.log(`[SCM]\t${uri} no longer dirty`);
-					this.changedResourceStates.delete(uri.fsPath);
-				}
-			}
+			});
+		} catch (error) {
+			console.error('Could not get scm state.');
+			console.error(error);
 		}
 
 		this.changedResources.resourceStates = [...this.changedResourceStates.values()];
@@ -410,6 +435,6 @@ export function getFileType(uri: Uri): PortalFileType {
 		case FOLDER_WEB_FILES:
 			return PortalFileType.webFile;
 		default:
-			throw Error(`[SCM] Unknown portal file type: ${fileFolder}.`);
+			return PortalFileType.other;
 	}
 }

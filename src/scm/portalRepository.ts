@@ -13,6 +13,7 @@ import * as path from 'path';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { PortalData, PortalFileType } from '../models/portalData';
 import { DynamicsApi } from '../api/dynamicsApi';
+import { ALL_FILES_GLOB } from './afs';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -41,26 +42,40 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	/**
 	 * Enumerates the resources under source control.
 	 */
-	provideSourceControlledResources(): Uri[] {
-		const result: Array<Uri> = new Array<Uri>();
+	async provideSourceControlledResources(): Promise<Set<Uri>> {
+		const result: Set<Uri> = new Set<Uri>();
+		const resultPaths = new Set<string>();
 
 		if (!this.portalData) {
 			return result;
 		}
 
 		for (const template of this.portalData.data.webTemplate.values()) {
-			const f = Uri.file(this.createLocalResourcePath(template.name, PortalFileType.webTemplate));
-			result.push(f);
+			// const f = Uri.file(this.createLocalResourcePath(template.name, PortalFileType.webTemplate));
+			resultPaths.add(this.createLocalResourcePath(template.name, PortalFileType.webTemplate));
 		}
 
 		for (const snippet of this.portalData.data.contentSnippet.values()) {
-			const f = Uri.file(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
-			result.push(f);
+			// const f = Uri.file(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
+			resultPaths.add(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
 		}
 
 		for (const file of this.portalData.data.webFile.values()) {
-			const f = Uri.file(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
-			result.push(f);
+			// const f = Uri.file(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
+			resultPaths.add(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
+		}
+
+		// iterate over all files currently in workspace folder. 
+		// this allows us to add files to the scm even if they haven't been tracked
+		// by scm before
+		const filesInFolder = await workspace.findFiles(ALL_FILES_GLOB);
+		for (const f of filesInFolder) {
+			resultPaths.add(f.fsPath);
+		}
+
+		// prepare result
+		for (const p of resultPaths) {
+			result.add(Uri.file(p));
 		}
 
 		return result;

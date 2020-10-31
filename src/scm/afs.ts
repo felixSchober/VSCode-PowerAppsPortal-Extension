@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 export const UTF8 = 'utf8';
 export const BASE64 = 'base64';
+export const ALL_FILES_GLOB = '**/*.*';
 
 function handleResult<T>(resolve: (result: T) => void, reject: (error: Error) => void, error: Error | null | undefined, result: T): void {
 	if (error) {
