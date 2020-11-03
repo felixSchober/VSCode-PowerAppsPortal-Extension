@@ -52,10 +52,24 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.changedResources = this.portalScm.createResourceGroup('workingTree', 'Changes');
 		this.portalRepository = new PowerAppsPortalRepository(workspaceFolder, configurationManager);
 		this.portalScm.quickDiffProvider = this.portalRepository;
-		this.portalScm.inputBox.placeholder = 'Not supported';
+		this.portalScm.inputBox.placeholder = 'This feature is not supported';
 
 		context.subscriptions.push(this.portalScm);
 		this.registerFileSystemWatcher(context, workspaceFolder);
+	}
+
+	private async downloadData(): Promise<PortalData> {
+		this.refreshStatusBar('$(sync~spin)', `Portal: Downloading`);
+		let result: PortalData;
+		try {
+			result = await this.portalRepository.download();
+		} catch (error) {
+			this.refreshStatusBar('$(dialog-error)', `Portal: Download Error`);
+			throw new Error(`[SCM] Could not download portal data: ${error}`);
+		}
+		this.refreshStatusBar('$(sync)', `${result.portalName}@${result.instanceName}`);
+		console.log('[SCM] Download complete');
+		return result;
 	}
 
 	public static async getPortalScm(
@@ -70,7 +84,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		let portalData: PortalData;
 
 		try {
-			portalData = await portalScm.portalRepository.download();
+			portalData = await portalScm.downloadData();
 		} catch (error) {
 			throw new Error(`[SCM] Could not download portal data: ${error}`);
 		}
@@ -123,14 +137,14 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		}
 	}
 
-	private refreshStatusBar() {
+	public refreshStatusBar(icon: string, text: string) {
 		this.portalScm.statusBarCommands = [
 			{
-				command: 'extension.source-control.checkout',
+				command: 'powerapps-portal-local-development.source-control.refresh',
 				arguments: [this],
-				title: `🔗 ${this.portalData.portalName}@${this.portalData.instanceName}`,
-				tooltip: 'Checkout portal.',
-			},
+				title: `${icon} ${text}`,
+				tooltip: 'Download latest portal changes',
+			}
 		];
 	}
 
@@ -248,7 +262,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			);
 		} else {
 			try {
-				const newPortalData = await this.portalRepository.download();
+				const newPortalData = await this.downloadData();
 
 				// force set data (overwrite = true)
 				await this.setPortalData(newPortalData, true);
@@ -263,7 +277,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	 * For example another user updates the Fiddle online.
 	 */
 	async refresh(): Promise<void> {
-		const latestPortalData = await this.portalRepository.download();
+		const latestPortalData = await this.downloadData();
 		this.setPortalData(latestPortalData, false);
 	}
 
@@ -287,7 +301,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 
 		this._onRepositoryChange.fire(this.portalData);
-		this.refreshStatusBar();
+		this.refreshStatusBar('$(refresh)', `${this.portalData.portalName}@${this.portalData.instanceName}`);
 		await this.tryUpdateChangedGroup();
 	}
 
@@ -447,7 +461,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			command: command,
 			decorations: {
 				strikeThrough: deleted,
-				tooltip: 'File was locally deleted.',
+				tooltip: 'File was locally deleted.'
 			},
 		};
 
