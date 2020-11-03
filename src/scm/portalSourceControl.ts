@@ -108,6 +108,21 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		return document.getText();
 	}
 
+	private async getLocalFile(uri: Uri, fileType: PortalFileType, fileAsBase64: boolean = false): Promise<string> {
+		if (fileType !== PortalFileType.webFile) {
+			const document = await workspace.openTextDocument(uri);
+			return document.getText();
+		} else {
+			const fileBuffer = await afs.readFile(uri.fsPath);
+			
+			if (fileAsBase64) {
+				return fileBuffer.toString(afs.BASE64);
+			} else {
+				return fileBuffer.toString();
+			}
+		}
+	}
+
 	private refreshStatusBar() {
 		this.portalScm.statusBarCommands = [
 			{
@@ -125,6 +140,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		} else {
 			console.log('[SCM] Commit data');
 
+			// commit all files to the repo
 			try {
 				await this.commitAllToRepo();
 			} catch (error) {
@@ -141,17 +157,19 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private async commitAllToRepo() {
 		return await window.withProgress({location: ProgressLocation.SourceControl}, async (progress, cancellationToken) => {
 			for (const changedResource of this.changedResourceStates.values()) {
+				const fileType = getFileType(changedResource.resourceUri);
 				// was deleted?
 				if (changedResource.decorations?.strikeThrough) {
-					await this.portalRepository.deleteFile(changedResource.resourceUri);
+					await this.portalRepository.deleteFile(fileType, changedResource.resourceUri);
 					continue;
 				}
 
+				const updatedContents = await this.getLocalFile(changedResource.resourceUri, fileType, true);
 				// was the file modified?
 				if (this.portalData.fileExists(changedResource.resourceUri)) {
-					await this.portalRepository.updateFile(changedResource.resourceUri);
+					await this.portalRepository.updateFile(fileType, changedResource.resourceUri, updatedContents);
 				} else {
-					await this.portalRepository.addFile(changedResource.resourceUri);
+					await this.portalRepository.addFile(fileType, changedResource.resourceUri, updatedContents);
 				}
 			}
 		});

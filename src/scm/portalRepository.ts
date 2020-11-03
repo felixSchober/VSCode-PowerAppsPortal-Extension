@@ -14,6 +14,10 @@ import { ConfigurationManager } from '../configuration/configurationManager';
 import { PortalData, PortalFileType } from '../models/portalData';
 import { DynamicsApi } from '../api/dynamicsApi';
 import { ALL_FILES_GLOB } from './afs';
+import { WebTemplate } from '../models/WebTemplate';
+import { getFileType } from './portalSourceControl';
+import { ContentSnippet } from '../models/ContentSnippet';
+import { WebFile } from '../models/WebFile';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -196,15 +200,96 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 	}
 
-	public async deleteFile(uri: Uri) {
+	public async deleteFile(fileType: PortalFileType, uri: Uri) {
 
 	}
 
-	public async updateFile(uri: Uri) {
+	public async updateFile(fileType: PortalFileType, uri: Uri, updatedFileContent: string): Promise<void> {
+		if (!this.portalData) {
+			throw Error('Could not update file because portal data in repo class was not set.');
+		}
 
+		switch (fileType) {
+			case PortalFileType.webTemplate:
+				const existingTemplate = this.portalData.getWebTemplate(uri);
+				const resultT = await this.updateWebTemplate(existingTemplate, updatedFileContent);
+				if (resultT) {
+					this.portalData.data.webTemplate.set(resultT.name, resultT);
+					console.log(`\t[REPO] Template ${resultT.name} was updated.`);
+				} else {
+					throw new Error(`Could not find file for uri ${uri}`);
+				}
+				
+				break;
+
+			case PortalFileType.contentSnippet:
+				const existingSnippet = this.portalData.getContentSnippet(uri);
+				const resultS = await this.updateContentSnippet(existingSnippet, updatedFileContent);
+
+				if (resultS) {
+					this.portalData.data.contentSnippet.set(resultS.name, resultS);
+					console.log(`\t[REPO] Snippet ${resultS.name} was updated.`);
+				} else {
+					throw new Error(`Could not find file for uri ${uri}`);
+				}
+
+				break;
+
+
+			case PortalFileType.webFile:
+				const existingFile = this.portalData.getWebFile(uri);
+				const resultF = await this.updateWebFile(existingFile, updatedFileContent);
+
+				if (resultF) {
+					this.portalData.data.webFile.set(resultF.d365Note.filename, resultF);
+					console.log(`\t[REPO] File ${resultF.d365Note.filename} was updated.`);
+				} else {
+					throw new Error(`Could not find file for uri ${uri}`);
+				}
+
+				break;
+
+			default:
+				break;
+		}
 	}
 
-	public async addFile(uri: Uri) {
+	private async updateWebTemplate(existingTemplate: WebTemplate | undefined, updatedFileContent: string): Promise<WebTemplate | undefined> {
+		if (!existingTemplate) {
+			return;
+		}
+
+		existingTemplate.source = updatedFileContent;
+		return await this.d365WebApi.updateWebTemplate(existingTemplate);
+	}
+
+	private async updateContentSnippet(existingSnippet: ContentSnippet | undefined, updatedFileContent: string): Promise<ContentSnippet | undefined> {
+		if(!existingSnippet) {
+			return;
+		}
+
+		existingSnippet.source = updatedFileContent;
+		return await this.d365WebApi.updateContentSnippet(existingSnippet);
+	}
+
+	private async updateWebFile(existingFile: WebFile | undefined, updatedFileContent: string): Promise<WebFile | undefined> {
+		if (!existingFile) {
+			return;
+		}
+
+		existingFile.updateDocumentContent = updatedFileContent;
+
+		const updatedNote = await this.d365WebApi.upateFiles([existingFile.d365Note]);
+
+		if (updatedNote.length > 0) {
+			existingFile.updateNote = updatedNote[0];
+			return existingFile;
+		}
+
+		throw Error(`Could not update file ${existingFile.d365File.adx_name}. Result set from dynamics was empty.`);
+	}
+
+	public async addFile(fileType: PortalFileType, uri: Uri, newFileContent: string) {
 
 	}
 

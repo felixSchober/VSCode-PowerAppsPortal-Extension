@@ -43,13 +43,11 @@ export class PortalData {
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				fileName = fileName.replace(/_/g, '/');
-
-				return this.data.contentSnippet.get(fileName)?.source || '';
+				return this.getContentSnippet(uri)?.source || '';
 			case PortalFileType.webTemplate:
-				return this.data.webTemplate.get(fileName)?.source || '';
+				return this.getWebTemplate(uri)?.source || '';
 			case PortalFileType.webFile:
-				const content = this.data.webFile.get(fileName)?.b64Content || '';
+				const content = this.getWebFile(uri)?.b64Content || '';
 				if (fileAsBase64) {
 					return content;
 				}
@@ -58,6 +56,22 @@ export class PortalData {
 			default:
 				return '';
 		}
+	}
+
+	public getContentSnippet(uri: Uri): ContentSnippet | undefined {
+		let fileName = getFilename(uri, PortalFileType.contentSnippet);
+		fileName = fileName.replace(/_/g, '/');
+		return this.data.contentSnippet.get(fileName);
+	}
+
+	public getWebTemplate(uri: Uri): WebTemplate | undefined {
+		let fileName = getFilename(uri, PortalFileType.webTemplate);
+		return this.data.webTemplate.get(fileName);
+	}
+
+	public getWebFile(uri: Uri): WebFile | undefined {
+		let fileName = getFilename(uri, PortalFileType.webFile);
+		return this.data.webFile.get(fileName);
 	}
 }
 

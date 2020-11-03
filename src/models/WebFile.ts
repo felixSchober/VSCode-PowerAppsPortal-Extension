@@ -16,4 +16,14 @@ export class WebFile {
 		this.d365Note = webNote;
 		this.d365File = webFile;
 	}
+	
+	set updateNote (note: ID365Note) {
+		this.d365Note = note;
+		this.b64Content = note.documentbody;
+	}
+
+	set updateDocumentContent(b64Content: string) {
+		this.b64Content = b64Content;
+		this.d365Note.documentbody = b64Content;
+	}
 }
