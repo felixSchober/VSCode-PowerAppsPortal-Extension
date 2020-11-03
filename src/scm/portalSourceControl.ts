@@ -124,28 +124,37 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			window.showErrorMessage('[SCM] There is nothing to commit.');
 		} else {
 			console.log('[SCM] Commit data');
-			// const html = await this.getLocalResourceText('html');
-			// const js = await this.getLocalResourceText('js');
-			// const css = await this.getLocalResourceText('css');
 
-			// // here we assume nobody updated the Fiddle on the server since we refreshed the list of versions
-			// try {
-			// 	const newFiddle = await uploadFiddle(
-			// 		this.fiddle.slug,
-			// 		this.fiddle.version + 1,
-			// 		html,
-			// 		js,
-			// 		css
-			// 	);
-			// 	if (!newFiddle) {
-			// 		return;
-			// 	}
-			// 	this.setFiddle(newFiddle, false);
-			// 	this.jsFiddleScm.inputBox.value = '';
-			// } catch (ex) {
-			// 	vscode.window.showErrorMessage('Cannot commit changes to JS Fiddle. ' + ex.message);
-			// }
+			try {
+				await this.commitAllToRepo();
+			} catch (error) {
+				window.showErrorMessage(`Could not commit all documents to Dynamics: ${error}`);
+			}
+			
+			
+
+			await this.setPortalData(this.portalRepository.getPortalData(), false);
+			window.showInformationMessage(`Data uploaded`);
 		}
+	}
+
+	private async commitAllToRepo() {
+		return await window.withProgress({location: ProgressLocation.SourceControl}, async (progress, cancellationToken) => {
+			for (const changedResource of this.changedResourceStates.values()) {
+				// was deleted?
+				if (changedResource.decorations?.strikeThrough) {
+					await this.portalRepository.deleteFile(changedResource.resourceUri);
+					continue;
+				}
+
+				// was the file modified?
+				if (this.portalData.fileExists(changedResource.resourceUri)) {
+					await this.portalRepository.updateFile(changedResource.resourceUri);
+				} else {
+					await this.portalRepository.addFile(changedResource.resourceUri);
+				}
+			}
+		});
 	}
 
 	/**

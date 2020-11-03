@@ -196,6 +196,26 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 	}
 
+	public async deleteFile(uri: Uri) {
+
+	}
+
+	public async updateFile(uri: Uri) {
+
+	}
+
+	public async addFile(uri: Uri) {
+
+	}
+
+	public getPortalData(): PortalData {
+		if (this.portalData) {
+			return this.portalData;
+		}
+
+		return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+	}
+
 	private async choosePortal(): Promise<string | undefined> {
 		const portals = await this.d365WebApi.getPortals();
 		const portalChoice = await window.showQuickPick(new Array(...portals.keys()), {
