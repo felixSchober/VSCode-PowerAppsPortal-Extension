@@ -1,14 +1,14 @@
 var dynamicsWebApi = require('dynamics-web-api');
-import { RetrieveMultipleRequest, RetrieveRequest } from 'dynamics-web-api';
+import { CreateRequest, DeleteRequest, RetrieveMultipleRequest, RetrieveRequest, UpdateRequest } from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
-import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
+import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365Note } from '../models/interfaces/d365Note';
 import { ID365PublishingState } from '../models/interfaces/d365PublishingState';
 import { ID365WebFile } from '../models/interfaces/d365WebFile';
 import { ID365Webpage } from '../models/interfaces/d365Webpage';
 import { ID365Website } from '../models/interfaces/d365Website';
-import { ID365WebTemplate } from '../models/interfaces/d365WebTemplate';
+import { ID365WebTemplate, WEBTEMPLATE_SELECT } from '../models/interfaces/d365WebTemplate';
 import { Language } from '../models/Language';
 import { WebFile } from '../models/WebFile';
 import { WebTemplate } from '../models/WebTemplate';
@@ -116,13 +116,7 @@ export class DynamicsApi {
 	public async getContentSnippets(websiteId: string): Promise<Array<ContentSnippet>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_contentsnippets',
-			select: [
-				'adx_name',
-				'adx_value',
-				'adx_contentsnippetid',
-				'versionnumber',
-				'_adx_contentsnippetlanguageid_value',
-			],
+			select: CONTENTSNIPPET_SELECT,
 			filter: '_adx_websiteid_value eq ' + websiteId,
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365ContentSnippet>(request);
@@ -142,10 +136,56 @@ export class DynamicsApi {
 		);
 	}
 
+	public async updateContentSnippet(update: ContentSnippet): Promise<ContentSnippet> {
+		const request: UpdateRequest = {
+			collection: 'adx_contentsnippets',
+			key: update.id,
+			returnRepresentation: true,
+			select: CONTENTSNIPPET_SELECT,
+			entity: {
+				adx_value: update.source
+			}
+		};
+
+		const c = await this.webApi.updateRequest<ID365ContentSnippet>(request);
+		return new ContentSnippet(
+			c.adx_value,
+			c._adx_contentsnippetlanguageid_value,
+			c.versionnumber,
+			c.adx_contentsnippetid,
+			c.adx_name
+		);
+	}
+
+	public async addContentSnippet(newSnippet: ID365ContentSnippet): Promise<ContentSnippet> {
+		const request: CreateRequest = {
+			collection: 'adx_contentsnippets',
+			entity: newSnippet,
+			returnRepresentation: true
+		};
+
+		const c = await this.webApi.createRequest<ID365ContentSnippet>(request);
+		return new ContentSnippet(
+			c.adx_value,
+			c._adx_contentsnippetlanguageid_value,
+			c.versionnumber,
+			c.adx_contentsnippetid,
+			c.adx_name
+		);
+	}
+
+	public async deleteContentSnippet(id: string): Promise<void> {
+		const request: DeleteRequest = {
+			collection: 'adx_contentsnippets',
+			key: id
+		};
+		await this.webApi.deleteRequest(request);
+	}
+
 	public async getWebTemplates(websiteId: string): Promise<Array<WebTemplate>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webtemplates',
-			select: ['adx_name', 'adx_source'],
+			select: WEBTEMPLATE_SELECT,
 			filter: '_adx_websiteid_value eq ' + websiteId,
 		};
 
@@ -156,6 +196,40 @@ export class DynamicsApi {
 
 		const result: Array<WebTemplate> = response.value.map((e) => new WebTemplate(e));
 		return result;
+	}
+
+	public async updateWebTemplate(update: WebTemplate): Promise<WebTemplate> {
+		const request: UpdateRequest = {
+			collection: 'adx_webtemplates',
+			key: update.id,
+			returnRepresentation: true,
+			select: WEBTEMPLATE_SELECT,
+			entity: {
+				adx_source: update.source
+			}
+		};
+
+		const result = await this.webApi.updateRequest<ID365WebTemplate>(request);
+		return new WebTemplate(result);
+	}
+
+	public async addWebTemplate(newTemplate: ID365WebTemplate): Promise<WebTemplate> {
+		const request: CreateRequest = {
+			collection: 'adx_webtemplates',
+			entity: newTemplate,
+			returnRepresentation: true
+		};
+
+		const result = await this.webApi.createRequest<ID365WebTemplate>(request);
+		return new WebTemplate(result);
+	}
+
+	public async deleteWebTemplate(templateId: string): Promise<void> {
+		const request: DeleteRequest = {
+			collection: 'adx_webtemplates',
+			key: templateId
+		};
+		await this.webApi.deleteRequest(request);
 	}
 
 	public async getWebFiles(portalId: string): Promise<Array<WebFile>> {
@@ -210,15 +284,15 @@ export class DynamicsApi {
 		return response.value;
 	}
 
-	public async uploadImages(
-		images: Array<ID365Note>,
+	public async uploadFiles(
+		files: Array<ID365Note>,
 		websiteId: string,
 		parentPageId: string,
 		publishingStateId: string
 	): Promise<Array<ID365WebFile>> {
 		const result: Array<ID365WebFile> = [];
 
-		for (const note of images) {
+		for (const note of files) {
 			console.log(`\t[D365 API] Creating webfile ${note.filename}`);
 			const file = await this.createWebFile(note.filename, websiteId, parentPageId, publishingStateId);
 
@@ -237,24 +311,23 @@ export class DynamicsApi {
 		return result;
 	}
 
-	public async updateImages(images: Array<ID365Note>): Promise<Array<ID365Note>> {
+	public async upateFiles(files: Array<ID365Note>): Promise<Array<ID365Note>> {
 		const result: Array<ID365Note> = [];
 
-		for (const img of images) {
-			if (!img.annotationid) {
-				throw Error(`[D365 API] Could not update image with name: ${img.filename}. Existing id was undefined.`);
+		for (const f of files) {
+			if (!f.annotationid) {
+				throw Error(`[D365 API] Could not update file with name: ${f.filename}. Existing id was undefined.`);
 			}
 
 			const updatedImage: any = {
-				documentbody: img.documentbody,
+				documentbody: f.documentbody,
 			};
 
-			console.log(`\t[D365 API] Updating image ${img.filename} to D365`);
-			await this.webApi.update<boolean>(img.annotationid, 'annotations', updatedImage);
-			console.log('\t[D365 API] Updated file: ' + img.filename);
-			result.push(img);
+			console.log(`\t[D365 API] Updating file ${f.filename} to D365`);
+			await this.webApi.update<boolean>(f.annotationid, 'annotations', updatedImage);
+			console.log('\t[D365 API] Updated file: ' + f.filename);
+			result.push(f);
 		}
-
 		return result;
 	}
 
