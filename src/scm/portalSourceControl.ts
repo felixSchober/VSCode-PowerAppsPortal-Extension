@@ -53,6 +53,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalRepository = new PowerAppsPortalRepository(workspaceFolder, configurationManager);
 		this.portalScm.quickDiffProvider = this.portalRepository;
 		this.portalScm.inputBox.placeholder = 'This feature is not supported';
+		this.portalScm.inputBox.visible = false;
 
 		context.subscriptions.push(this.portalScm);
 		this.registerFileSystemWatcher(context, workspaceFolder);
