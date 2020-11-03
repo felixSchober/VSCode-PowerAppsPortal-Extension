@@ -15,7 +15,6 @@ import { PortalData, PortalFileType } from '../models/portalData';
 import { DynamicsApi } from '../api/dynamicsApi';
 import { ALL_FILES_GLOB } from './afs';
 import { WebTemplate } from '../models/WebTemplate';
-import { getFileType } from './portalSourceControl';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { WebFile } from '../models/WebFile';
 
@@ -200,8 +199,38 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 	}
 
-	public async deleteFile(fileType: PortalFileType, uri: Uri) {
+	public async deleteFile(fileType: PortalFileType, uri: Uri): Promise<void> {
+		switch (fileType) {
+			case PortalFileType.webTemplate:
+				const t = this.portalData?.getWebTemplate(uri);
+				if (!t) {
+					throw Error('Could not find file in portal data with path ' + uri.fsPath);
+				}
+				await this.d365WebApi.deleteWebTemplate(t.id);
+				this.portalData?.data.webTemplate.delete(t.name);
+				break;
+			
+			case PortalFileType.contentSnippet:
+				const s = this.portalData?.getContentSnippet(uri);
+				if (!s) {
+					throw Error('Could not find file in portal data with path ' + uri.fsPath);
+				}
+				await this.d365WebApi.deleteContentSnippet(s.id);
+				this.portalData?.data.webTemplate.delete(s.name);
+				break;
 
+			case PortalFileType.webFile:
+				const f = this.portalData?.getWebTemplate(uri);
+				if (!f) {
+					throw Error('Could not find file in portal data with path ' + uri.fsPath);
+				}
+				await this.d365WebApi.deleteWebTemplate(f.id);
+				this.portalData?.data.webTemplate.delete(f.name);
+				break;
+		
+			default:
+				break;
+		}
 	}
 
 	public async updateFile(fileType: PortalFileType, uri: Uri, updatedFileContent: string): Promise<void> {
