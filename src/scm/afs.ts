@@ -1,4 +1,4 @@
-// This file promisifies necessary file system functions. 
+// This file promisifies necessary file system functions.
 // This should be removed when VS Code updates to Node.js ^11.14 and replaced by the native fs promises.
 
 import * as vscode from 'vscode';
@@ -7,7 +7,12 @@ export const UTF8 = 'utf8';
 export const BASE64 = 'base64';
 export const ALL_FILES_GLOB = '**/*.*';
 
-function handleResult<T>(resolve: (result: T) => void, reject: (error: Error) => void, error: Error | null | undefined, result: T): void {
+function handleResult<T>(
+	resolve: (result: T) => void,
+	reject: (error: Error) => void,
+	error: Error | null | undefined,
+	result: T
+): void {
 	if (error) {
 		reject(massageError(error));
 	} else {
@@ -43,19 +48,34 @@ export function readFile(path: string): Promise<Buffer> {
 
 export function writeDocument(path: string, content: any): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
-		fs.writeFile(path, content, error => handleResult(resolve, reject, error, void 0));
+		fs.writeFile(path, content, (error) => handleResult(resolve, reject, error, void 0));
 	});
 }
 
 export function writeBase64File(path: string, content: any): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
-		fs.writeFile(path, content, {encoding: BASE64}, error => handleResult(resolve, reject, error, void 0));
+		fs.writeFile(path, content, { encoding: BASE64 }, (error) => handleResult(resolve, reject, error, void 0));
+	});
+}
+
+export function createFolder(path: string): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		if (!fs.existsSync(path)) {
+			fs.mkdir(path, { recursive: true }, (err) => {
+				if (err) {
+					reject(`Could not create folder for path ${path} due to error: ${err}`);
+				}
+				resolve();
+			});
+		} else {
+			resolve();
+		}
 	});
 }
 
 export function exists(path: string): Promise<boolean> {
 	return new Promise<boolean>((resolve, reject) => {
-		fs.exists(path, exists => handleResult(resolve, reject, null, exists));
+		fs.exists(path, (exists) => handleResult(resolve, reject, null, exists));
 	});
 }
 
@@ -67,6 +87,6 @@ export function readdir(path: string): Promise<string[]> {
 
 export function unlink(path: string): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
-		fs.unlink(path, error => handleResult(resolve, reject, error, void 0));
+		fs.unlink(path, (error) => handleResult(resolve, reject, error, void 0));
 	});
 }

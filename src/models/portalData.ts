@@ -60,7 +60,6 @@ export class PortalData {
 
 	public getContentSnippet(uri: Uri): ContentSnippet | undefined {
 		let fileName = getFilename(uri, PortalFileType.contentSnippet);
-		fileName = fileName.replace(/_/g, '/');
 		return this.data.contentSnippet.get(fileName);
 	}
 

@@ -103,7 +103,11 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		portalScm.portalData = portalData;
 
 		// clone portal to the local workspace
-		await portalScm.setPortalData(portalData, overwrite);
+		try {
+			await portalScm.setPortalData(portalData, overwrite);
+		} catch (ex) {
+			window.showErrorMessage(ex);
+		}
 		return portalScm;
 	}
 
@@ -119,7 +123,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 	private async getLocalResourceText(fileName: string, fileType: PortalFileType) {
 		const document = await workspace.openTextDocument(
-			this.portalRepository.createLocalResourcePath(fileName, fileType)
+			await this.portalRepository.createLocalResourcePath(fileName, fileType)
 		);
 		return document.getText();
 	}
@@ -163,9 +167,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				window.showErrorMessage(`Could not commit all documents to Dynamics: ${error}`);
 			}
 			
-			
+			try {
+				await this.setPortalData(this.portalRepository.getPortalData(), false);
+			} catch (ex) {
+				window.showErrorMessage(ex);
+			}
 
-			await this.setPortalData(this.portalRepository.getPortalData(), false);
 			window.showInformationMessage(`Data uploaded`);
 		}
 	}
@@ -201,15 +208,15 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES));
 
 		for (const snippet of this.portalData.data.contentSnippet.values()) {
-			this.resetFile(snippet.name, PortalFileType.contentSnippet);
+			await this.resetFile(snippet.name, PortalFileType.contentSnippet);
 		}
 
 		for (const template of this.portalData.data.webTemplate.values()) {
-			this.resetFile(template.name, PortalFileType.webTemplate);
+			await this.resetFile(template.name, PortalFileType.webTemplate);
 		}
 
 		for (const webFile of this.portalData.data.webFile.values()) {
-			this.resetFile(webFile.d365Note.filename, PortalFileType.webFile);
+			await this.resetFile(webFile.d365Note.filename, PortalFileType.webFile);
 		}
 
 		// delete new existing non-tracked files
@@ -230,7 +237,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 	/** Resets the given local file content to the checked-out version. */
 	private async resetFile(fileName: string, fileType: PortalFileType): Promise<void> {
-		const filePath = this.portalRepository.createLocalResourcePath(fileName, fileType);
+		const filePath = await this.portalRepository.createLocalResourcePath(fileName, fileType);
 
 		let fileContent: string = '';
 
@@ -279,8 +286,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	 * For example another user updates the Fiddle online.
 	 */
 	async refresh(): Promise<void> {
-		const latestPortalData = await this.downloadData();
-		this.setPortalData(latestPortalData, false);
+		try {
+			const latestPortalData = await this.downloadData();
+			await this.setPortalData(latestPortalData, false);
+		} catch (ex) {
+			window.showErrorMessage(ex);
+		}
 	}
 
 	private async setPortalData(newPortalData: PortalData, overwrite: boolean) {
@@ -295,7 +306,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalData = newPortalData;
 		if (overwrite) {
 			// overwrite local file content
-			this.resetFilesToCheckedOutVersion();
+			await this.resetFilesToCheckedOutVersion();
 		}
 
 		// initially, mark all files as changed
@@ -488,20 +499,32 @@ export function getFilename(uri: Uri, fileType?: PortalFileType): string {
 	if (fileType && fileType === PortalFileType.webFile) {
 		return path.basename(uri.fsPath);
 	}
+
+	if (fileType === PortalFileType.contentSnippet) {
+		// get base path up from FOLDER_CONTENT_SNIPPETS
+		const folders = uri.fsPath.split(path.sep);
+		const contentSnippetIndex = folders.indexOf(FOLDER_CONTENT_SNIPPETS);
+		const fileName = folders.slice(contentSnippetIndex + 1);
+		const fn = fileName.join('/').split('.')[0];
+		return fn;
+	}
 	return path.basename(uri.fsPath).split('.')[0];
 }
 
 export function getFileType(uri: Uri): PortalFileType {
 	const folders = path.dirname(uri.fsPath).split(path.sep);
-	const fileFolder = folders[folders.length - 1];
-	switch (fileFolder) {
-		case FOLDER_CONTENT_SNIPPETS:
-			return PortalFileType.contentSnippet;
-		case FOLDER_TEMPLATES:
-			return PortalFileType.webTemplate;
-		case FOLDER_WEB_FILES:
-			return PortalFileType.webFile;
-		default:
-			return PortalFileType.other;
+
+	if (folders.includes(FOLDER_CONTENT_SNIPPETS)) {
+		return PortalFileType.contentSnippet;
 	}
+
+	if (folders.includes(FOLDER_TEMPLATES)) {
+		return PortalFileType.webTemplate;
+	}
+
+	if (folders.includes(FOLDER_WEB_FILES)) {
+		return PortalFileType.webFile;
+	}
+
+	return PortalFileType.other;
 }

@@ -13,7 +13,7 @@ import * as path from 'path';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { PortalData, PortalFileType } from '../models/portalData';
 import { DynamicsApi } from '../api/dynamicsApi';
-import { ALL_FILES_GLOB } from './afs';
+import { ALL_FILES_GLOB, createFolder } from './afs';
 import { WebTemplate } from '../models/WebTemplate';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { WebFile } from '../models/WebFile';
@@ -54,18 +54,20 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 
 		for (const template of this.portalData.data.webTemplate.values()) {
-			// const f = Uri.file(this.createLocalResourcePath(template.name, PortalFileType.webTemplate));
-			resultPaths.add(this.createLocalResourcePath(template.name, PortalFileType.webTemplate));
+			const p = await this.createLocalResourcePath(template.name, PortalFileType.webTemplate);
+			resultPaths.add(p);
 		}
 
 		for (const snippet of this.portalData.data.contentSnippet.values()) {
 			// const f = Uri.file(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
-			resultPaths.add(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
+			const p = await this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet);
+			resultPaths.add(p);
 		}
 
 		for (const file of this.portalData.data.webFile.values()) {
 			// const f = Uri.file(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
-			resultPaths.add(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
+			const p = await this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile);
+			resultPaths.add(p);
 		}
 
 		// iterate over all files currently in workspace folder. 
@@ -95,13 +97,23 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	 * @param extension fiddle part, which is also used as a file extension
 	 * @returns path of the locally cloned fiddle resource ending with the given extension
 	 */
-	createLocalResourcePath(fileName: string, fileType: PortalFileType) {
+	async createLocalResourcePath(fileName: string, fileType: PortalFileType) {
 		let fileTypePath = '';
-		fileName = fileName.replace(/\//g, '_');
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
+				const filePath = fileName.split('/');
+				//fileName = fileName.replace(/\//g, '_');
+				fileName = filePath.pop() || fileName;
 				fileTypePath = FOLDER_CONTENT_SNIPPETS;
-				break;
+				const snippetPath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, ...filePath);
+				try {
+					await createFolder(snippetPath);
+				} catch (error) {
+					console.error(`Could not create folder ${snippetPath}`);
+					throw Error(`Could not create folder ${snippetPath}`);
+				}
+				return path.join(snippetPath, fileName + '.html');
+
 
 			case PortalFileType.webFile:
 				fileTypePath = FOLDER_WEB_FILES;
