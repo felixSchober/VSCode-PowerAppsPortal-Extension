@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 export interface ID365Note {
 
 	annotationid: string | undefined;
@@ -7,4 +8,7 @@ export interface ID365Note {
 	documentbody: string;
 	filesize: number;
 	versionnumber: number;
+	mimetype: string;
 }
+
+export const NOTE_SELECT = ['annotationid', 'filename', 'isdocument', 'documentbody', 'filesize', 'versionnumber', '_objectid_value', 'mimetype'];

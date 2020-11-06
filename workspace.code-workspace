@@ -7,9 +7,34 @@
 	"settings": {
 		"typescript.tsc.autoDetect": "off",
 		"cSpell.words": [
+			"CONTENTSNIPPET",
 			"POWERAPPSPORTAL",
+			"WEBTEMPLATE",
 			"adal",
-			"keytar"
+			"annotationid",
+			"changedresouce",
+			"contentsnippetid",
+			"contentsnippetlanguageid",
+			"contentsnippets",
+			"documentbody",
+			"filesize",
+			"isdocument",
+			"isroot",
+			"keytar",
+			"languagelocale",
+			"languagelocaleid",
+			"objectid",
+			"objecttypecode",
+			"partialurl",
+			"publishingstateid",
+			"publishingstates",
+			"versionnumber",
+			"webfile",
+			"webfileid",
+			"webfiles",
+			"webpageid",
+			"websiteid",
+			"webtemplates"
 		]
 	}
 }

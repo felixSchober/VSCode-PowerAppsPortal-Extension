@@ -73,6 +73,10 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		// by scm before
 		const filesInFolder = await workspace.findFiles(ALL_FILES_GLOB);
 		for (const f of filesInFolder) {
+			if (!f) {
+				console.error(`Could not track file.`);
+				continue;
+			}
 			resultPaths.add(f.fsPath);
 		}
 
@@ -179,6 +183,9 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	
 				const webFiles = await this.d365WebApi.getWebFiles(portalId);
 				for (const file of webFiles) {
+					if (!file || !file.d365Note) {
+						console.error(`Could not get a file.`);
+					}
 					result.data.webFile.set(file.d365Note.filename, file);
 				}
 	
@@ -306,12 +313,12 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			return;
 		}
 
-		existingFile.updateDocumentContent = updatedFileContent;
+		existingFile.b64Content = updatedFileContent;
 
-		const updatedNote = await this.d365WebApi.upateFiles([existingFile.d365Note]);
+		const updatedNote = await this.d365WebApi.updateFiles([existingFile.d365Note]);
 
 		if (updatedNote.length > 0) {
-			existingFile.updateNote = updatedNote[0];
+			existingFile.d365Note = updatedNote[0];
 			return existingFile;
 		}
 
@@ -319,7 +326,11 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	}
 
 	public async addFile(fileType: PortalFileType, uri: Uri, newFileContent: string) {
+		if (!this.portalData) {
+			throw Error('Could not update file because portal data in repo class was not set.');
+		}
 
+		
 	}
 
 	public getPortalData(): PortalData {

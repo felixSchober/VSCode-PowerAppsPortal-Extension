@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 var dynamicsWebApi = require('dynamics-web-api');
 import { CreateRequest, DeleteRequest, RetrieveMultipleRequest, RetrieveRequest, UpdateRequest } from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
-import { ID365Note } from '../models/interfaces/d365Note';
+import { ID365Note, NOTE_SELECT } from '../models/interfaces/d365Note';
 import { ID365PublishingState } from '../models/interfaces/d365PublishingState';
 import { ID365WebFile } from '../models/interfaces/d365WebFile';
 import { ID365Webpage } from '../models/interfaces/d365Webpage';
@@ -31,7 +32,7 @@ export class DynamicsApi {
 		const webApiUrl = `https://${this.d365InstanceName}.${this.d365CrmRegion}.dynamics.com/api/data/v9.1/`;
 		this.webApi = new dynamicsWebApi({
 			webApiUrl: webApiUrl,
-			onTokenRefresh: (callback: any) => adalConnect.aquireToken(callback),
+			onTokenRefresh: (callback: any) => adalConnect.acquireToken(callback),
 		});
 	}
 
@@ -239,7 +240,7 @@ export class DynamicsApi {
 		console.log('[D365 API] Getting web file');
 		const response = await this.webApi.retrieveMultiple<ID365WebFile>('adx_webfiles', select, filter);
 		if (!response.value) {
-			console.error("[D365 API] Could't get web files. Reponse value was empty.");
+			console.error("[D365 API] Couldn't get web files. Response value was empty.");
 			return [];
 		}
 
@@ -273,7 +274,7 @@ export class DynamicsApi {
 		const request: RetrieveMultipleRequest = {
 			collection: 'annotations',
 			filter: "objecttypecode eq 'adx_webfile' and isdocument eq true",
-			select: ['annotationid', 'filename', 'isdocument', 'documentbody', 'filesize', 'versionnumber', '_objectid_value'],
+			select: NOTE_SELECT,
 		};
 
 		const response = await this.webApi.retrieveAllRequest<ID365Note>(request);
@@ -297,7 +298,7 @@ export class DynamicsApi {
 			const file = await this.createWebFile(note.filename, websiteId, parentPageId, publishingStateId);
 
 			if (!file.adx_webfileid) {
-				throw Error(`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on obejct`);
+				throw Error(`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on object`);
 			}
 
 			console.log(`\t[D365 API] Uploading contents to webfile ${note.filename}. File Id: ${file.adx_webfileid}`);
@@ -311,7 +312,7 @@ export class DynamicsApi {
 		return result;
 	}
 
-	public async upateFiles(files: Array<ID365Note>): Promise<Array<ID365Note>> {
+	public async updateFiles(files: Array<ID365Note>): Promise<Array<ID365Note>> {
 		const result: Array<ID365Note> = [];
 
 		for (const f of files) {
@@ -321,6 +322,7 @@ export class DynamicsApi {
 
 			const updatedImage: any = {
 				documentbody: f.documentbody,
+				mimetype: f.mimetype
 			};
 
 			console.log(`\t[D365 API] Updating file ${f.filename} to D365`);

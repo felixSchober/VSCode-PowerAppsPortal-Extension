@@ -66,7 +66,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			result = await this.portalRepository.download();
 		} catch (error) {
 			this.refreshStatusBar('$(dialog-error)', `Portal: Download Error`);
-			throw new Error(`[SCM] Could not download portal data: ${error}`);
+			window.showErrorMessage(`Could not download portal data: ${error}`);
+			throw new Error(`[SCM] Could not download portal data: ${error.message}`);
 		}
 		this.refreshStatusBar('$(sync)', `${result.portalName}@${result.instanceName}`);
 		console.log('[SCM] Download complete');
@@ -387,10 +388,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
 					if (isDirty) {
 						const resourceState = this.toSourceControlResourceState(uri, wasDeleted);
 		
-						// use a map to prevent duplicate change entriees
+						// use a map to prevent duplicate change entries
 						this.changedResourceStates.set(uri.fsPath, resourceState);
 					} else {
-						// uri is not dirty. check if it is in changedresouce state (could have been previously changed but then changed back)
+						// uri is not dirty. check if it is in 'changedresouce' state (could have been previously changed but then changed back)
 						if (this.changedResourceStates.has(uri.fsPath)) {
 							console.log(`[SCM]\t${uri} no longer dirty`);
 							this.changedResourceStates.delete(uri.fsPath);

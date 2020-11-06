@@ -17,13 +17,13 @@ export class CrmAdalConnectionSettings {
 		if (!configurationManager.isConfigured) {
 			throw new Error('[AUTH] Configuration Manager is not configured.');
 		}
-		const creds = configurationManager.credentialManager?.getCredentials();
+		const credentials = configurationManager.credentialManager?.getCredentials();
 
 		this.instanceName = configurationManager.d365InstanceName || '';
 		this.crmRegion = configurationManager.d365CrmRegion || '';
-		this.aadClientId = creds?.clientId || '';
-		this.aadClientSecret = creds?.clientSecret || '';
-		this.aadTenantId = creds?.aadTenantId || '';
+		this.aadClientId = credentials?.clientId || '';
+		this.aadClientSecret = credentials?.clientSecret || '';
+		this.aadTenantId = credentials?.aadTenantId || '';
 		this.resourceUrl = `https://${this.instanceName}.${this.crmRegion}.dynamics.com`;
 		this.authenticated = false;
 
@@ -31,8 +31,8 @@ export class CrmAdalConnectionSettings {
 		this.adalContext = new AuthenticationContext(authorityUrl);
 	}
 
-	public aquireToken(callback: OnTokenAcquiredCallback) {
-		const adalTokenAquiredCallback = (error: Error, response: TokenResponse | ErrorResponse) => {
+	public acquireToken(callback: OnTokenAcquiredCallback) {
+		const adalTokenAcquiredCallback = (error: Error, response: TokenResponse | ErrorResponse) => {
 			if (error) {
 				const errorMessage = `Could not authenticate with provided credentials. \nError Details:\n\tMessage: ${error.message}\n\tStack: ${error.stack}`;
 				console.error('[AUTH] ' + errorMessage);
@@ -49,7 +49,7 @@ export class CrmAdalConnectionSettings {
 			this.resourceUrl,
 			this.aadClientId,
 			this.aadClientSecret,
-			adalTokenAquiredCallback
+			adalTokenAcquiredCallback
 		);
 		console.log('[AUTH] Authentication prepared.');
 	}
