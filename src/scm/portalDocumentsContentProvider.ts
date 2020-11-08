@@ -55,6 +55,7 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 			return '';
 		}
 
-		return this.portalData.getDocumentContent(uri);
+		const c = this.portalData.getDocumentContent(uri);
+		return c;
 	}
 }

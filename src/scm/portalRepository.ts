@@ -17,6 +17,8 @@ import { ALL_FILES_GLOB, createFolder } from './afs';
 import { WebTemplate } from '../models/WebTemplate';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { WebFile } from '../models/WebFile';
+import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
+import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -30,11 +32,13 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	public portalName: string | undefined;
 	public portalId: string | undefined;
 	private portalData: PortalData | undefined;
+	public languages: Map<string, ID365PortalLanguage>;
 
 	constructor(workspaceFolder: WorkspaceFolder, configurationManager: ConfigurationManager) {
 		this.workspaceFolder = workspaceFolder;
 		this.configurationManager = configurationManager;
 		this.d365WebApi = new DynamicsApi(this.configurationManager);
+		this.languages = new Map<string, ID365PortalLanguage>();
 	}
 
 	provideOriginalResource(uri: Uri, token: CancellationToken | null): ProviderResult<Uri> {
@@ -54,19 +58,19 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 
 		for (const template of this.portalData.data.webTemplate.values()) {
-			const p = await this.createLocalResourcePath(template.name, PortalFileType.webTemplate);
+			const p = await this.createLocalResourcePath(template.name, PortalFileType.webTemplate, template);
 			resultPaths.add(p);
 		}
 
 		for (const snippet of this.portalData.data.contentSnippet.values()) {
 			// const f = Uri.file(this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet));
-			const p = await this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet);
+			const p = await this.createLocalResourcePath(snippet.name, PortalFileType.contentSnippet, snippet);
 			resultPaths.add(p);
 		}
 
 		for (const file of this.portalData.data.webFile.values()) {
 			// const f = Uri.file(this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile));
-			const p = await this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile);
+			const p = await this.createLocalResourcePath(file.d365Note.filename, PortalFileType.webFile, file);
 			resultPaths.add(p);
 		}
 
@@ -97,13 +101,15 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	 * @param extension fiddle part, which is also used as a file extension
 	 * @returns path of the locally cloned fiddle resource ending with the given extension
 	 */
-	async createLocalResourcePath(fileName: string, fileType: PortalFileType) {
+	async createLocalResourcePath(fileName: string, fileType: PortalFileType, portalDataFile: IPortalDataDocument) {
+		fileName = fileName.toLowerCase();
 		let fileTypePath = '';
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
+				const snippetDocument = portalDataFile as ContentSnippet;
 				const filePath = fileName.split('/');
-				//fileName = fileName.replace(/\//g, '_');
 				fileName = filePath.pop() || fileName;
+				// fileName = fileName.replace('/', '_');
 				fileTypePath = FOLDER_CONTENT_SNIPPETS;
 				const snippetPath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, ...filePath);
 				try {
@@ -155,12 +161,26 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					portalId = this.configurationManager.portalId;
 					this.portalName = this.configurationManager.portalName;
 				}
-	
-	
+
 				if (!portalId) {
 					console.error('[REPO] Could not get portal id either from existing configuration or from user.');
 					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
 				}
+
+				if (this.languages.size === 0) {
+					console.log('[REPO] Getting languages');
+					const languages = await this.d365WebApi.getLanguages(portalId);
+
+					if (languages.size === 0) {
+						window.showWarningMessage('Could not get any languages from portal. en-us will be set as the default.');
+					}
+
+					this.languages = languages;
+
+					console.log(`[REPO] Received ${this.languages.size} languages (not all of them active)`);
+				}			
+	
+				
 	
 				progressMessage += `\n\tPortal resolved: ${this.portalName}`;
 				progress.report({
@@ -169,6 +189,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				});
 	
 				const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+				result.languages = this.languages;
 				const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
 	
 				progressMessage += `\n\t✓ Templates: ${webTemplates.length}`;
@@ -178,10 +199,10 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				});
 	
 				for (const template of webTemplates) {
-					result.data.webTemplate.set(template.name, template);
+					result.data.webTemplate.set(template.name.toLowerCase(), template);
 				}
 	
-				const contentSnippets = await this.d365WebApi.getContentSnippets(portalId);
+				const contentSnippets = await this.d365WebApi.getContentSnippets(portalId, this.languages);
 				
 				progressMessage += `\n\t✓ Content Snippets: ${webTemplates.length}`;
 				progress.report({
@@ -190,7 +211,12 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				});
 	
 				for (const snippet of contentSnippets) {
-					result.data.contentSnippet.set(snippet.name, snippet);
+					const namePath = snippet.name.split('/');
+
+					// insert language into name path e.g. 'Account/SignIn/PageCopy'
+					// -> 'Account/SignIn/en-us/PageCopy'
+					const name = [...namePath.slice(0, namePath.length - 1), snippet.language, namePath[namePath.length - 1]];
+					result.data.contentSnippet.set(name.join('/').toLowerCase(), snippet);
 				}
 	
 				const webFiles = await this.d365WebApi.getWebFiles(portalId);
@@ -198,7 +224,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					if (!file || !file.d365Note) {
 						console.error(`Could not get a file.`);
 					}
-					result.data.webFile.set(file.d365Note.filename, file);
+					result.data.webFile.set(file.d365Note.filename.toLowerCase(), file);
 				}
 	
 				progressMessage += `\n\t✓ Files: ${webTemplates.length}`;

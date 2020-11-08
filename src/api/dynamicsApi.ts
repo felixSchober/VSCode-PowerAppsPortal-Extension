@@ -1,16 +1,22 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 var dynamicsWebApi = require('dynamics-web-api');
-import { CreateRequest, DeleteRequest, RetrieveMultipleRequest, RetrieveRequest, UpdateRequest } from 'dynamics-web-api';
+import {
+	CreateRequest,
+	DeleteRequest,
+	RetrieveMultipleRequest,
+	RetrieveRequest,
+	UpdateRequest,
+} from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
+import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
 import { ID365Note, NOTE_SELECT } from '../models/interfaces/d365Note';
 import { ID365PublishingState } from '../models/interfaces/d365PublishingState';
 import { ID365WebFile } from '../models/interfaces/d365WebFile';
 import { ID365Webpage } from '../models/interfaces/d365Webpage';
 import { ID365Website } from '../models/interfaces/d365Website';
 import { ID365WebTemplate, WEBTEMPLATE_SELECT } from '../models/interfaces/d365WebTemplate';
-import { Language } from '../models/Language';
 import { WebFile } from '../models/WebFile';
 import { WebTemplate } from '../models/WebTemplate';
 import { CrmAdalConnectionSettings } from './adalConnection';
@@ -36,16 +42,32 @@ export class DynamicsApi {
 		});
 	}
 
-	public async getLanguage(languageCode: string): Promise<Language> {
-		const select = ['languagelocaleid', 'code'];
-		const filter = `code eq '${languageCode}'`;
-		const response = await this.webApi.retrieveMultiple<Language>('languagelocale', select, filter);
+	public async getLanguages(portalId: string): Promise<Map<string, ID365PortalLanguage>> {
+		const websiteLanguageRequest: RetrieveMultipleRequest = {
+			collection: 'adx_websitelanguages',
+			select: ['adx_websitelanguageid', 'adx_name', '_adx_portallanguageid_value'],
+			filter: '_adx_websiteid_value eq ' + portalId
+		};
+		const websiteLanguageResponse = await this.webApi.retrieveAllRequest<ID365WebsiteLanguage>(websiteLanguageRequest);
 
-		if (!response || !response.value || response.value?.length < 1) {
-			throw Error('Could not get language from Dynamics instance with code eq ' + languageCode);
+		const portalLanguageRequest: RetrieveMultipleRequest = {
+			collection: 'adx_portallanguages',
+			select: ['adx_languagecode', 'adx_displayname', 'adx_portallanguageid'],
+		};
+		const portalLanguageResponse = await this.webApi.retrieveAllRequest<ID365PortalLanguage>(portalLanguageRequest);
+
+		const result = new Map<string, ID365PortalLanguage>();
+
+		for (const websiteLanguage of websiteLanguageResponse.value || []) {
+			// try get the matching portal language
+			const portalLanguage = portalLanguageResponse.value?.find(l => l.adx_portallanguageid === websiteLanguage._adx_portallanguageid_value);
+			if (portalLanguage) {
+				result.set(websiteLanguage.adx_websitelanguageid, portalLanguage);
+			} else {
+				console.warn(`Could not fit website language for portal language ${websiteLanguage.adx_name}`);
+			}
 		}
 
-		const result = response.value[0];
 		return result;
 	}
 
@@ -114,7 +136,10 @@ export class DynamicsApi {
 		return result;
 	}
 
-	public async getContentSnippets(websiteId: string): Promise<Array<ContentSnippet>> {
+	public async getContentSnippets(
+		websiteId: string,
+		languages: Map<string, ID365PortalLanguage>
+	): Promise<Array<ContentSnippet>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_contentsnippets',
 			select: CONTENTSNIPPET_SELECT,
@@ -125,16 +150,10 @@ export class DynamicsApi {
 			throw Error(`Could not get content snippets from dynamics instance for website with id ${websiteId}.`);
 		}
 
-		return response.value.map(
-			(c) =>
-				new ContentSnippet(
-					c.adx_value,
-					c._adx_contentsnippetlanguageid_value,
-					c.versionnumber,
-					c.adx_contentsnippetid,
-					c.adx_name
-				)
-		);
+		return response.value.map((c) => {
+			const languageCode = languages.get(c._adx_contentsnippetlanguageid_value)?.adx_languagecode || 'en-US';
+			return new ContentSnippet(c.adx_value, languageCode, c.versionnumber, c.adx_contentsnippetid, c.adx_name);
+		});
 	}
 
 	public async updateContentSnippet(update: ContentSnippet): Promise<ContentSnippet> {
@@ -144,8 +163,8 @@ export class DynamicsApi {
 			returnRepresentation: true,
 			select: CONTENTSNIPPET_SELECT,
 			entity: {
-				adx_value: update.source
-			}
+				adx_value: update.source,
+			},
 		};
 
 		const c = await this.webApi.updateRequest<ID365ContentSnippet>(request);
@@ -162,7 +181,7 @@ export class DynamicsApi {
 		const request: CreateRequest = {
 			collection: 'adx_contentsnippets',
 			entity: newSnippet,
-			returnRepresentation: true
+			returnRepresentation: true,
 		};
 
 		const c = await this.webApi.createRequest<ID365ContentSnippet>(request);
@@ -178,7 +197,7 @@ export class DynamicsApi {
 	public async deleteContentSnippet(id: string): Promise<void> {
 		const request: DeleteRequest = {
 			collection: 'adx_contentsnippets',
-			key: id
+			key: id,
 		};
 		await this.webApi.deleteRequest(request);
 	}
@@ -206,8 +225,8 @@ export class DynamicsApi {
 			returnRepresentation: true,
 			select: WEBTEMPLATE_SELECT,
 			entity: {
-				adx_source: update.source
-			}
+				adx_source: update.source,
+			},
 		};
 
 		const result = await this.webApi.updateRequest<ID365WebTemplate>(request);
@@ -218,7 +237,7 @@ export class DynamicsApi {
 		const request: CreateRequest = {
 			collection: 'adx_webtemplates',
 			entity: newTemplate,
-			returnRepresentation: true
+			returnRepresentation: true,
 		};
 
 		const result = await this.webApi.createRequest<ID365WebTemplate>(request);
@@ -228,7 +247,7 @@ export class DynamicsApi {
 	public async deleteWebTemplate(templateId: string): Promise<void> {
 		const request: DeleteRequest = {
 			collection: 'adx_webtemplates',
-			key: templateId
+			key: templateId,
 		};
 		await this.webApi.deleteRequest(request);
 	}
@@ -251,7 +270,7 @@ export class DynamicsApi {
 		const webFileNotesMap = new Map<string, ID365Note>(webFileNotes.map((note) => [note._objectid_value, note]));
 
 		let result: Array<WebFile> = [];
-		
+
 		for (const webFile of response.value) {
 			if (!webFile.adx_webfileid) {
 				throw Error(`Could not get web file with name ${webFile.adx_name} because id was undefined.`);
@@ -260,13 +279,15 @@ export class DynamicsApi {
 			const note = webFileNotesMap.get(webFile.adx_webfileid);
 
 			if (!note) {
-				console.warn(`Could not get file contents for web file with id ${webFile.adx_webfileid} and name ${webFile.adx_name}`);
+				console.warn(
+					`Could not get file contents for web file with id ${webFile.adx_webfileid} and name ${webFile.adx_name}`
+				);
 				continue;
 			}
 
 			result.push(new WebFile(webFile, note));
 		}
-		
+
 		return result;
 	}
 
@@ -298,7 +319,9 @@ export class DynamicsApi {
 			const file = await this.createWebFile(note.filename, websiteId, parentPageId, publishingStateId);
 
 			if (!file.adx_webfileid) {
-				throw Error(`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on object`);
+				throw Error(
+					`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on object`
+				);
 			}
 
 			console.log(`\t[D365 API] Uploading contents to webfile ${note.filename}. File Id: ${file.adx_webfileid}`);
@@ -322,7 +345,7 @@ export class DynamicsApi {
 
 			const updatedImage: any = {
 				documentbody: f.documentbody,
-				mimetype: f.mimetype
+				mimetype: f.mimetype,
 			};
 
 			console.log(`\t[D365 API] Updating file ${f.filename} to D365`);

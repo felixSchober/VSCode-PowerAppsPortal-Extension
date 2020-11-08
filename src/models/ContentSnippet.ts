@@ -1,4 +1,6 @@
-export class ContentSnippet {
+import { IPortalDataDocument } from "./interfaces/dataDocument";
+
+export class ContentSnippet implements IPortalDataDocument {
 	constructor(
 		public source: string,
 		public language: string,

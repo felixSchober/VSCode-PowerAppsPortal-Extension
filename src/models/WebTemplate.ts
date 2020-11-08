@@ -1,6 +1,7 @@
 import { ID365WebTemplate } from "./interfaces/d365WebTemplate";
+import { IPortalDataDocument } from "./interfaces/dataDocument";
 
-export class WebTemplate {
+export class WebTemplate implements IPortalDataDocument {
 	public name: string;
 	public source: string;
 	public id: string;

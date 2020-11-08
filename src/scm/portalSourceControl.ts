@@ -24,10 +24,13 @@ import {
 	FOLDER_WEB_FILES,
 	PowerAppsPortalRepository,
 } from './portalRepository';
-import { PortalData, PortalFileType } from '../models/portalData';
+import { getFilename, getFileType, PortalData, PortalFileType } from '../models/portalData';
 import { Utils } from '../utils';
 import path = require('path');
 import { ALL_FILES_GLOB } from './afs';
+import { IPortalDataDocument } from '../models/interfaces/dataDocument';
+import * as mime from 'mime-types';
+import { DEFAULT_MIME_TYPE } from '../models/WebFile';
 
 export class PowerAppsPortalSourceControl implements Disposable {
 	private portalScm: SourceControl;
@@ -121,13 +124,6 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		context.subscriptions.push(fileSystemWatcher);
 	}
 
-	private async getLocalResourceText(fileName: string, fileType: PortalFileType) {
-		const document = await workspace.openTextDocument(
-			await this.portalRepository.createLocalResourcePath(fileName, fileType)
-		);
-		return document.getText();
-	}
-
 	private async getLocalFile(uri: Uri, fileType: PortalFileType, fileAsBase64: boolean = false): Promise<string> {
 		if (fileType !== PortalFileType.webFile) {
 			const document = await workspace.openTextDocument(uri);
@@ -207,16 +203,16 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES));
 		Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES));
 
-		for (const snippet of this.portalData.data.contentSnippet.values()) {
-			await this.resetFile(snippet.name, PortalFileType.contentSnippet);
+		for (const snippet of this.portalData.data.contentSnippet.entries()) {
+			await this.resetFile(snippet[0], PortalFileType.contentSnippet, snippet[1]);
 		}
 
 		for (const template of this.portalData.data.webTemplate.values()) {
-			await this.resetFile(template.name, PortalFileType.webTemplate);
+			await this.resetFile(template.name, PortalFileType.webTemplate, template);
 		}
 
 		for (const webFile of this.portalData.data.webFile.values()) {
-			await this.resetFile(webFile.d365Note.filename, PortalFileType.webFile);
+			await this.resetFile(webFile.d365Note.filename, PortalFileType.webFile, webFile);
 		}
 
 		// delete new existing non-tracked files
@@ -236,8 +232,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	/** Resets the given local file content to the checked-out version. */
-	private async resetFile(fileName: string, fileType: PortalFileType): Promise<void> {
-		const filePath = await this.portalRepository.createLocalResourcePath(fileName, fileType);
+	private async resetFile(fileName: string, fileType: PortalFileType, portalDocument: IPortalDataDocument): Promise<void> {
+		const filePath = await this.portalRepository.createLocalResourcePath(fileName, fileType, portalDocument);
 
 		let fileContent: string = '';
 
@@ -248,11 +244,13 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				break;
 
 			case PortalFileType.webTemplate:
+				fileName = fileName.toLowerCase();
 				fileContent = this.portalData.data.webTemplate.get(fileName)?.source || '';
 				await afs.writeDocument(filePath, fileContent);
 				break;
 
 			case PortalFileType.webFile:
+				fileName = fileName.toLowerCase();
 				fileContent = this.portalData.data.webFile.get(fileName)?.b64Content || '';
 				await afs.writeBase64File(filePath, fileContent);
 				break;
@@ -369,17 +367,24 @@ export class PowerAppsPortalSourceControl implements Disposable {
 					let wasDeleted: boolean;
 		
 					const pathExists = await afs.exists(uri.fsPath);
-		
 					if (pathExists) {
+						const m = mime.lookup(uri.fsPath) || DEFAULT_MIME_TYPE;
 						let document: TextDocument;
-						try {
-							document = await workspace.openTextDocument(uri);
-							isDirty = this.isDirty(document);
-						} catch (error) {
+						if (m.startsWith('text')) {
+							try {
+								document = await workspace.openTextDocument(uri);
+								isDirty = this.isDirty(document);
+							} catch (error) {
+								const fileBuffer = await afs.readFile(uri.fsPath);
+								const encodedFile = fileBuffer.toString(afs.BASE64);
+								isDirty = this.isDirtyBase64(uri, encodedFile);
+							}
+						} else {
 							const fileBuffer = await afs.readFile(uri.fsPath);
 							const encodedFile = fileBuffer.toString(afs.BASE64);
 							isDirty = this.isDirtyBase64(uri, encodedFile);
 						}
+						
 						
 						wasDeleted = false;
 					} else {
@@ -491,40 +496,4 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 }
 
-/**
- * Gets extension trimming the dot character.
- * @param uri document uri
- */
-export function getFilename(uri: Uri, fileType?: PortalFileType): string {
-	if (fileType && fileType === PortalFileType.webFile) {
-		return path.basename(uri.fsPath);
-	}
 
-	if (fileType === PortalFileType.contentSnippet) {
-		// get base path up from FOLDER_CONTENT_SNIPPETS
-		const folders = uri.fsPath.split(path.sep);
-		const contentSnippetIndex = folders.indexOf(FOLDER_CONTENT_SNIPPETS);
-		const fileName = folders.slice(contentSnippetIndex + 1);
-		const fn = fileName.join('/').split('.')[0];
-		return fn;
-	}
-	return path.basename(uri.fsPath).split('.')[0];
-}
-
-export function getFileType(uri: Uri): PortalFileType {
-	const folders = path.dirname(uri.fsPath).split(path.sep);
-
-	if (folders.includes(FOLDER_CONTENT_SNIPPETS)) {
-		return PortalFileType.contentSnippet;
-	}
-
-	if (folders.includes(FOLDER_TEMPLATES)) {
-		return PortalFileType.webTemplate;
-	}
-
-	if (folders.includes(FOLDER_WEB_FILES)) {
-		return PortalFileType.webFile;
-	}
-
-	return PortalFileType.other;
-}

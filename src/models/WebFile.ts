@@ -1,10 +1,11 @@
 import { ID365Note } from "./interfaces/d365Note";
 import { ID365WebFile } from "./interfaces/d365WebFile";
 import * as mime from 'mime-types';
+import { IPortalDataDocument } from "./interfaces/dataDocument";
 
 export const DEFAULT_MIME_TYPE = 'application/octet-stream';
 
-export class WebFile {
+export class WebFile implements IPortalDataDocument {
 
 	public name: string;
 	public id: string;

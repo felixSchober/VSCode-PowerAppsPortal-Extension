@@ -1,14 +1,17 @@
 import { Uri } from 'vscode';
 import { BASE64 } from '../scm/afs';
-import { getFilename, getFileType } from '../scm/portalSourceControl';
 import { ContentSnippet } from './ContentSnippet';
 import { WebFile } from './WebFile';
 import { WebTemplate } from './WebTemplate';
+import path = require('path');
+import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from '../scm/portalRepository';
+import { ID365PortalLanguage } from './interfaces/d365Language';
 
 export class PortalData {
 	public instanceName: string;
 	public portalName: string;
 	public data: IPortalDocuments;
+	public languages = new Map<string, ID365PortalLanguage>();
 
 	constructor(instanceName: string, portalName: string) {
 		this.instanceName = instanceName;
@@ -26,7 +29,7 @@ export class PortalData {
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				fileName = fileName.replace(/_/g, '/');
+				// fileName = fileName.replace(/_/g, '/');
 				return this.data.contentSnippet.has(fileName);
 			case PortalFileType.webTemplate:
 				return this.data.webTemplate.has(fileName);
@@ -39,7 +42,6 @@ export class PortalData {
 
 	public getDocumentContent(uri: Uri, fileAsBase64: boolean = false): string {
 		const fileType = getFileType(uri);
-		let fileName = getFilename(uri, fileType);
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
@@ -72,6 +74,45 @@ export class PortalData {
 		let fileName = getFilename(uri, PortalFileType.webFile);
 		return this.data.webFile.get(fileName);
 	}
+}
+
+/**
+ * Get the name of the file
+ * @param uri document uri
+ */
+export function getFilename(uri: Uri, fileType?: PortalFileType): string {
+	if (fileType && fileType === PortalFileType.webFile) {
+		return path.basename(uri.fsPath).toLowerCase();
+	}
+
+	if (fileType === PortalFileType.contentSnippet) {
+		// get base path up from FOLDER_CONTENT_SNIPPETS
+		const folders = uri.fsPath.split(path.sep);
+		const contentSnippetIndex = folders.indexOf(FOLDER_CONTENT_SNIPPETS);
+		// const fileName = [...folders.slice(contentSnippetIndex + 1, folders.length - 2), folders[folders.length - 1]];
+		const fileName = folders.slice(contentSnippetIndex + 1);
+		const fn = fileName.join('/').split('.')[0];
+		return fn.toLowerCase();
+	}
+	return path.basename(uri.fsPath).split('.')[0].toLowerCase();
+}
+
+export function getFileType(uri: Uri): PortalFileType {
+	const folders = path.dirname(uri.fsPath).split(path.sep);
+
+	if (folders.includes(FOLDER_CONTENT_SNIPPETS)) {
+		return PortalFileType.contentSnippet;
+	}
+
+	if (folders.includes(FOLDER_TEMPLATES)) {
+		return PortalFileType.webTemplate;
+	}
+
+	if (folders.includes(FOLDER_WEB_FILES)) {
+		return PortalFileType.webFile;
+	}
+
+	return PortalFileType.other;
 }
 
 export interface IPortalDocuments {
