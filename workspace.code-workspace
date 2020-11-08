@@ -34,6 +34,8 @@
 			"portallanguages",
 			"publishingstateid",
 			"publishingstates",
+			"statecode",
+			"statuscode",
 			"versionnumber",
 			"webfile",
 			"webfileid",

@@ -9,6 +9,6 @@ export class WebTemplate implements IPortalDataDocument {
 	constructor(template: ID365WebTemplate) {
 		this.name = template.adx_name;
 		this.source = template.adx_source;
-		this.id = template.adx_webtemplateid;
+		this.id = template.adx_webtemplateid || '';
 	}
 }

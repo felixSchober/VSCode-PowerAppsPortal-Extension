@@ -6,16 +6,21 @@ import { WebTemplate } from './WebTemplate';
 import path = require('path');
 import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from '../scm/portalRepository';
 import { ID365PortalLanguage } from './interfaces/d365Language';
+import { ID365Webpage } from './interfaces/d365Webpage';
 
 export class PortalData {
 	public instanceName: string;
 	public portalName: string;
 	public data: IPortalDocuments;
 	public languages = new Map<string, ID365PortalLanguage>();
+	public publishedStateId: string | undefined;
+	public webPages: Array<ID365Webpage>;
 
 	constructor(instanceName: string, portalName: string) {
 		this.instanceName = instanceName;
 		this.portalName = portalName;
+		this.webPages = new Array<ID365Webpage>();
+
 		this.data = {
 			contentSnippet: new Map<string, ContentSnippet>(),
 			webFile: new Map<string, WebFile>(),
@@ -73,6 +78,26 @@ export class PortalData {
 	public getWebFile(uri: Uri): WebFile | undefined {
 		let fileName = getFilename(uri, PortalFileType.webFile);
 		return this.data.webFile.get(fileName);
+	}
+
+	public getLanguageFromPath(uri: Uri): string {
+		// return language id based on the path
+
+		if (this.languages.size === 0) {
+			throw Error('Could not get language from path because languages are not defined.');
+		}
+		const filePathComponents = uri.fsPath.split(path.sep);
+		// find something like en-us in the path
+		for (const [languageId, languageObj] of this.languages.entries()) {
+			const foundCodeInPath = filePathComponents.includes(languageObj.adx_languagecode.toLocaleLowerCase());
+			if (foundCodeInPath) {
+				console.log(`[PORTAL DATA] Detected language ${languageObj.adx_displayname} for path ${uri.fsPath}`);
+				return languageId;
+			}
+		}
+
+		// return default, which is language not specified
+		return '';
 	}
 }
 

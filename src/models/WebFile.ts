@@ -18,13 +18,13 @@ export class WebFile implements IPortalDataDocument {
 		this._d365Note = webNote;
 		this._d365File = webFile;
 		if (!this._d365Note.mimetype || this._d365Note.mimetype === DEFAULT_MIME_TYPE) {
-			this._d365Note.mimetype = mime.lookup(this._d365Note.filename) || DEFAULT_MIME_TYPE;
+			this._d365Note.mimetype = getMimeType(this._d365Note.filename);
 		}		
 	}
 	
 	set d365Note (note: ID365Note) {
 		this._d365Note = note;
-		this._d365Note.mimetype = mime.lookup(note.filename) || DEFAULT_MIME_TYPE;
+		this._d365Note.mimetype = getMimeType(note.filename);
 	}
 
 	get d365Note(): ID365Note {
@@ -44,4 +44,8 @@ export class WebFile implements IPortalDataDocument {
 	}
 
 	
+}
+
+export function getMimeType(fileName: string): string {
+	return mime.lookup(fileName) || DEFAULT_MIME_TYPE;
 }

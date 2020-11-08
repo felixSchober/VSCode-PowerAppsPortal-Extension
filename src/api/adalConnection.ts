@@ -1,6 +1,7 @@
 import { AuthenticationContext, ErrorResponse, TokenResponse } from 'adal-node';
 import { OnTokenAcquiredCallback } from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';
+import * as vscode from 'vscode';
 
 export class CrmAdalConnectionSettings {
 	instanceName: string;
@@ -36,7 +37,7 @@ export class CrmAdalConnectionSettings {
 			if (error) {
 				const errorMessage = `Could not authenticate with provided credentials. \nError Details:\n\tMessage: ${error.message}\n\tStack: ${error.stack}`;
 				console.error('[AUTH] ' + errorMessage);
-				return;
+				vscode.window.showErrorMessage(`Could not authenticate with provided credentials. To configure the extension again, issue the command '>PowerApps Portals: Configure'. \nError Details:\n\tMessage: ${error.message}`);
 			}
 
 			// authentication successful

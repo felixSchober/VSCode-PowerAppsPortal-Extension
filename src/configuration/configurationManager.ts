@@ -1,4 +1,4 @@
-import { ExtensionContext, workspace, WorkspaceFolder } from 'vscode';
+import { ExtensionContext, window, workspace, WorkspaceFolder } from 'vscode';
 import { IPortalConfigurationFile } from '../models/interfaces/portalConfigurationFile';
 import { CredentialManager } from './credentialManager';
 import { multiStepInput } from './quickInputConfigurator';
@@ -37,7 +37,7 @@ export class ConfigurationManager {
 		return `${this.d365InstanceName}.${this.d365CrmRegion}.dynamics.com`;
 	}
 
-	public async load(context: ExtensionContext) {
+	public async load(context: ExtensionContext, triggedFromConfigureCommand: boolean) {
 		// either the values can be loaded from a configuration file or the configuration quickInput has to be used
 		try {
 			await this.loadConfiguration();
@@ -45,9 +45,38 @@ export class ConfigurationManager {
 			console.log('[CONFIG] Could not get pre existing configuration from config store. Getting new values. Error: ' + error);
 		}
 
+
 		if (this.isConfigured) {
 			console.log('[CONFIG] Configuration successfully loaded from local store.');
-			return;
+
+			let reconfigureExtension: boolean | undefined;
+
+			// only allow reconfigure if not executed by manual command
+			if (triggedFromConfigureCommand) {
+				let question: string;
+				if (this.isPortalDataConfigured) {
+					question = `Existing configuration for portal ${this.portalName} found. Replace?`;
+				} else {
+					question = `Existing configuration for instance ${this.d365InstanceName} found. Replace?`;
+				}
+	
+				reconfigureExtension = await getConsent(question);
+			}
+			
+			if (!reconfigureExtension) {
+				return;
+			}
+
+			console.log('[START] Reconfigure with user consent');
+
+			const configFilePath = this.getConfigurationFilePath();
+			const configFileExists = await afs.exists(configFilePath);
+			if (configFileExists) {
+				console.log('[CONFIG] Delete existing portal config file');
+				await afs.unlink(configFilePath);
+				this.portalId = undefined;
+				this.portalName = undefined;
+			}
 		}
 
 		await this.configure(context);
@@ -155,4 +184,15 @@ export class ConfigurationManager {
 	private getConfigurationFilePath(): string{
 		return path.join(this.workspaceFolder.uri.fsPath, PORTAL_CONFIGURATION_FILE);
 	}
+}
+
+export async function getConsent(question: string): Promise<boolean> {
+	const options = ['Yes', 'No'];
+	const answer = await window.showQuickPick(options, { placeHolder: question });
+
+	if (answer && answer === options[0]) {
+		console.log('[START] User consent for ' + question);
+		return true;
+	}
+	return false;
 }

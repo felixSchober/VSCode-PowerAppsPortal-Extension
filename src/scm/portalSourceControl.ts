@@ -150,7 +150,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		];
 	}
 
-	async commitAll(): Promise<void> {
+	public async commitAll(): Promise<void> {
 		if (!this.changedResources.resourceStates.length) {
 			window.showErrorMessage('[SCM] There is nothing to commit.');
 		} else {
@@ -158,7 +158,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 			// commit all files to the repo
 			try {
-				await this.commitAllToRepo();
+				await this.prepareCommitToRepository();
 			} catch (error) {
 				window.showErrorMessage(`Could not commit all documents to Dynamics: ${error}`);
 			}
@@ -169,26 +169,40 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				window.showErrorMessage(ex);
 			}
 
-			window.showInformationMessage(`Data uploaded`);
+			window.showInformationMessage(`Data uploaded`, {modal: false});
 		}
 	}
 
-	private async commitAllToRepo() {
+	private async prepareCommitToRepository() {
 		return await window.withProgress({location: ProgressLocation.SourceControl}, async (progress, cancellationToken) => {
 			for (const changedResource of this.changedResourceStates.values()) {
 				const fileType = getFileType(changedResource.resourceUri);
 				// was deleted?
 				if (changedResource.decorations?.strikeThrough) {
-					await this.portalRepository.deleteFile(fileType, changedResource.resourceUri);
+					try {
+						await this.portalRepository.deleteDocumentInRepository(fileType, changedResource.resourceUri);
+						console.log(`[SCM] Deleting ${changedResource.resourceUri}.`);
+					} catch (error) {
+						window.showErrorMessage(`Could not delete file ${changedResource.resourceUri}. Error: ${error}`);
+					}
 					continue;
 				}
 
 				const updatedContents = await this.getLocalFile(changedResource.resourceUri, fileType, true);
 				// was the file modified?
 				if (this.portalData.fileExists(changedResource.resourceUri)) {
-					await this.portalRepository.updateFile(fileType, changedResource.resourceUri, updatedContents);
+					try {
+						await this.portalRepository.updateDocumentInRepository(fileType, changedResource.resourceUri, updatedContents);
+					} catch (error) {
+						window.showErrorMessage(`Could not update file ${changedResource.resourceUri}. Error: ${error}`);
+					}
 				} else {
-					await this.portalRepository.addFile(fileType, changedResource.resourceUri, updatedContents);
+					// file added
+					try {
+						await this.portalRepository.addDocumentToRepository(fileType, changedResource.resourceUri, updatedContents);
+					} catch (error) {
+						window.showErrorMessage(`Could not add file ${changedResource.resourceUri}. Error: ${error}`);
+					}
 				}
 			}
 		});
@@ -224,7 +238,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 					continue;
 				}
 				console.log(`[SCM] Deleting ${f.resourceUri}.`);
-				await afs.unlink(f.resourceUri.fsPath);
+
+				try {
+					await afs.unlink(f.resourceUri.fsPath);
+				} catch (error) {
+					console.warn(`Could not delete file ${f.resourceUri.fsPath}. Error: ${error}`);
+				}
 			}
 		}
 
@@ -310,7 +329,6 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// initially, mark all files as changed
 		this.changedGroup = await this.portalRepository.provideSourceControlledResources();
 
-
 		this._onRepositoryChange.fire(this.portalData);
 		this.refreshStatusBar('$(refresh)', `${this.portalData.portalName}@${this.portalData.instanceName}`);
 		await this.tryUpdateChangedGroup();
@@ -355,6 +373,27 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 		try {
 			await window.withProgress({location: ProgressLocation.SourceControl}, async () => {
+
+				// first check all files with a deleted resource state
+				// we want to make sure that are actually deleted
+				for (const [resourceStateKey, deletedFile] of this.changedResourceStates.entries()) {
+					// skip non deleted files
+					if (!deletedFile.decorations?.strikeThrough) {
+						continue;
+					}
+
+					const fileExistsInPortalData = this.portalData.fileExists(deletedFile.resourceUri);
+					
+					// file does still exist in local repo
+					if (fileExistsInPortalData) {
+						continue;
+					} else {
+						// file does not exist in local repo -> remove it from 
+						// changed resource. In case it has been restored, it will be re
+						this.changedResourceStates.delete(resourceStateKey);
+					}
+				}
+
 
 				for (const uri of uris) {
 
