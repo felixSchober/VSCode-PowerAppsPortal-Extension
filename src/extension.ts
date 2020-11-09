@@ -270,7 +270,7 @@ async function configureExtension(
 	}
 
 	// only overwrite data if new instance which hasn't been configured before
-	const overwriteData = configurationManager.isPortalDataConfigured;
+	const overwriteData = !configurationManager.isPortalDataConfigured;
 
 	// register source control
 	let portalScm: PowerAppsPortalSourceControl;

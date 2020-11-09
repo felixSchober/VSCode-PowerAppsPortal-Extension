@@ -21,8 +21,13 @@
 		"vscode": "^1.50.0"
 	},
 	"categories": [
-		"SCM Providers"
+		"SCM Providers",
+		"Other"
 	],
+	"galleryBanner": {
+		"color": "#742774",
+		"theme": "light"
+	},
 	"keywords": [
 		"Power Apps Portals",
 		"Dynamics",
@@ -30,6 +35,7 @@
 		"Liquid",
 		"Power Platform"
 	],
+	"qna": "marketplace",
 	"activationEvents": [
 		"onCommand:powerapps-portal-local-development.configureExtension",
 		"workspaceContains:.portal"

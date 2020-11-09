@@ -77,6 +77,13 @@ export class ConfigurationManager {
 				this.portalId = undefined;
 				this.portalName = undefined;
 			}
+		} else {
+			// application not configured.
+			// only force manual configuration if triggered by command
+			console.log(`[CONFIG] Not configured. Continue with manual configuration: ${triggedFromConfigureCommand}`);
+			if (!triggedFromConfigureCommand) {
+				return;
+			}
 		}
 
 		await this.configure(context);

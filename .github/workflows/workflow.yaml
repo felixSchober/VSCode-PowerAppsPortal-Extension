@@ -1,3 +1,5 @@
+name: "Build & Deploy"
+
 on:
   push:
     branches: 
@@ -71,9 +73,9 @@ jobs:
           name: powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
           path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
 
-      # - name: publish to marketplace
-      #   if: github.ref == 'refs/heads/master'
-      #   run: npm run deploy ${{ env.PAT }}
+      - name: publish to marketplace
+        if: github.ref == 'refs/heads/master'
+        run: npm run deploy ${{ env.PAT }}
 
       - name: create a release
         if: github.ref == 'refs/heads/master'
