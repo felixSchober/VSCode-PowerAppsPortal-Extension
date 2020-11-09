@@ -1,6 +1,4 @@
 # PowerApps Portals Local Source Control
-![.github/workflows/workflow.yaml](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/workflows/.github/workflows/workflow.yaml/badge.svg?branch=master)
-
 
 Currently, there is only one way to edit code for [Power Apps portals](https://powerapps.microsoft.com/en-us/portals/) which is using the Dynamics solution and the somewhat limited online editor.
 

@@ -3,7 +3,7 @@
 	"displayName": "PowerApps Portal Local Development",
 	"description": "Local source control of power apps portals code including web files like images or style sheets, web templates and content snippets.",
 	"version": "0.1.0",
-	"icon": "https://raw.githubusercontent.com/felixSchober/VSCode-PowerAppsPortal-Extension/master/resources/icons/icon.png?token=ACTVPOP4SOVKRSQLSUNGQJC7UGPJI",
+	"icon": "resources/icons/icon.png",
 	"homepage": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
 	"bugs": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/issues",
 	"author": {
@@ -151,7 +151,7 @@
 		"mocha": "^8.1.3",
 		"typescript": "^4.0.2",
 		"vscode-test": "^1.4.0",
-		"vsce": "~1.71.0"
+		"vsce": "^1.81.1"
 	},
 	"dependencies": {
 		"adal-node": "^0.2.1",
