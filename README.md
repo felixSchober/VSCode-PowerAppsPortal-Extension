@@ -1,65 +1,162 @@
-# powerapps-portal-local-development README
+# PowerApps Portals Local Source Control
 
-This is the README for your extension "powerapps-portal-local-development". After writing up a brief description, we recommend including the following sections.
+Currently, there is only one way to edit code for [Power Apps portals](https://powerapps.microsoft.com/en-us/portals/) which is using the Dynamics solution and the somewhat limited online editor.
+
+This extension provides a local source control of portal code including **web files** like images or style sheets, **web templates** and **content snippets**.
+
+Once configured, the extension loads all portal code and files to a local project folder. Then, you can edit, create or delete files. These changes can be pushed to the portal using the source control pane within visual studio code.
+
+![Change Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_intro.gif)
+
+>**IMPORTANT** This extension is currently in preview. There are bugs and there will be strange behavior. Please only use this in demo or dev environments and not for production (yet).
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### Modify file
 
-For example if there is an image subfolder under your extension project workspace:
+You can modify web files, content snippets and web template code:
+![Change Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_intro.gif)
 
-\!\[feature X\]\(images/feature-x.png\)
+### Add new (Web) File
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+You can add new web files, new templates and new content snippets. For new content snippets, the language is applied by following the language code from the path
 
-## Requirements
+![Add new Web File](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/02_feature.gif)
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+### Delete Files
 
-## Extension Settings
+You can delete web files, templates and content snippets.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+![Delete Content Snippet](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/03_feature.gif)
 
-For example:
+### Refresh to get latest changes
 
-This extension contributes the following settings:
+You can refresh the remote changes. This will download all files. If there are changes, they will appear in the source control pane.
 
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+![Refresh](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_feature.gif)
+
+### Discard local changes
+
+Within the source control pane, you can click discard to discard all your local changes with the cached origin. To get the latest changes from origin, make sure to hit refresh.
+
+![Discard](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/05_feature.gif)
+
+
+## Setup
+
+This extension connects to your CDS/Dynamics instance with a [client credentials authentication](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow) flow. This means that in order to connect to your instance you need to have the following information ready:
+
+- Client Id (Azure Active Directory)
+- Tenant Id (Azure Active Directory)
+- Client Secret (Azure Active Directory)
+- URL of your instance (Dynamics)
+
+If you already have an application user in Dynamics connected to an app registration in Azure Active Directory (AAD), then you are good to go.
+
+If you do not have this yet, then follow this guide to set everything up:
+
+### Create AAD App
+First, you have to create a new 'Application Registration' in Azure Active Directory. 
+
+Follow the guide on the official Microsoft documentation: [Tutorial: Register an app with Azure Active Directory
+](https://docs.microsoft.com/en-us/powerapps/developer/common-data-service/walkthrough-register-app-azure-active-directory)
+
+Lastly, you have to create the client secret which the application is going to use to obtain the token.
+Within the app registration page, go to **Certificates & secrets**
+
+![Certificates and Secrets](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_appRegistrationSecret.png)
+
+Then, create a new **client secret** and specify a life time.
+
+![Create client secret](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/02_appRegistrationSecret.png)
+
+Make sure to note down this secret because it will disappear once the page is closed.
+
+Finally, to obtain all Ids you need in the following step, go to the **Overview** page and note down the highlighted values:
+
+![Application Id and Tenant Id](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/03_appRegistrationSecret.png)
+
+### Create Application User
+Now, you have to create an [Application User](https://docs.microsoft.com/en-us/power-platform/admin/create-users-assign-online-security-roles#create-an-application-user) in Dynamics. This will be the user this extension uses to load and upload portal data.
+
+Make sure, you have the client id ready from the previous step.
+
+To create this user, follow the guide on the official Microsoft documentation: [Create Application User](https://docs.microsoft.com/en-us/powerapps/developer/common-data-service/use-single-tenant-server-server-authentication#application-user-creation)
+
+> **Important**: Don't forget to assign security role(s) to this application user.
+
+#### Security Roles: Required Entities
+
+- READ: Website Languages (*adx_websitelanguages*)
+- READ: Portal Languages (*adx_portallanguages*)
+- READ: Websites (*adx_websites*)
+- READ: Web Pages (*adx_webpages*)
+- READ: Publishing States (*adx_publishingstates*)
+- FULL: Content Snippets (*adx_contentsnippets*)
+- FULL: Web Templates (*adx_webtemplates*)
+- FULL: Annotations (*annotations*)
+- FULL: Web Files (*adx_webfiles*)
+
+
+## Configuration
+
+To start using this application, issue the command >PowerApps Portals Configure
+
+![Configuration Steps Example](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configuration.gif)
+
+Alternatively, you can also configure the extension from the settings.json located in `.vscode/settings.json`.
+```json
+{
+	"powerappsPortals.aadTenantId": "00000000-0000-0000-0000-000000000000",
+	"powerappsPortals.aadClientId": "00000000-0000-0000-0000-000000000000",
+	"powerappsPortals.dynamicsInstanceName": "dynamicsUrl",
+	"powerappsPortals.dynamicsCrmRegion": "crm4"
+}
+```
+
+Information about the selected portal is stored in `.portal` located in your main project folder.
+
+```json
+{
+	"portalId": "00000000-0000-0000-0000-000000000000",
+	"portalName": "Your Portal Name"
+}
+```
+
+### What happens with the client secret?
+
+The client secret is stored encrypted on your local system keychain [keytar](https://github.com/atom/node-keytar). Where this is stored depends on your operating system.
+
+Quoting from the project:
+
+> On macOS the passwords are managed by the Keychain, on Linux they are managed by the Secret Service API/libsecret, and on Windows they are managed by Credential Vault.
+
+The key takeaway here is that the secret is not stored somewhere in your project code.
+
+## Limitations
+
+Currently, this extension supports
+- web templates
+- web files
+- content snippets
+
+All other entity types are currently not supported. Support for web links etc. might come in the future.
+
+Also, this extension does not create pages automatically, while you can create new web templates you still have to go to Dynamics to create a new web page and add the template to the web page manually.
+
+In addition, there is no auto completion support but this might also be added in the future.
+
+This extension uses the source control pane in Visual Studio Code to show changes. However, this extension **does not provide a source control history**. You cannot undo a commit to the portal origin. Similarly, if you choose to checkout the files from the portal origin with your local files, you basically overwrite your local files with the portal files in your online Dynamics.
+
+This limitation also applies to merge conflicts. Before committing your changes, always make sure you are using the most recent online file version. When you commit your files you are overwriting the origin file, not merging it.
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+Issues are tracked here: https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/issues
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.1.0
 
-### 1.0.0
+Initial preview release of extension
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
------------------------------------------------------------------------------------------------------------
-
-## Working with Markdown
-
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (macOS) to see a list of Markdown snippets
-
-### For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
