@@ -12,7 +12,7 @@
 	},
 	"license": "MIT",
 	"preview": true,
-	"publisher": "",
+	"publisher": "FelixSchober",
 	"repository": {
 		"url": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
 		"type": "git"
