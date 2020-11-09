@@ -1,8 +1,8 @@
 {
 	"name": "powerapps-portal-local-development",
 	"displayName": "PowerApps Portal Local Development",
-	"description": "TODO",
-	"version": "0.0.1",
+	"description": "Currently, there is only one way to edit code for Power Apps portals which is using the Dynamics solution and the somewhat limited online editor. This extension provides a local source control of portal code including web files like images or style sheets, web templates and content snippets. Once configured, the extension loads all portal code and files to a local project folder. Then, you can edit, create or delete files. These changes can be pushed to the portal using the source control pane within visual studio code.",
+	"version": "0.1.0",
 	"icon": "https://raw.githubusercontent.com/felixSchober/VSCode-PowerAppsPortal-Extension/master/resources/icons/icon.png?token=ACTVPOP4SOVKRSQLSUNGQJC7UGPJI",
 	"homepage": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
 	"bugs": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/issues",
@@ -10,6 +10,7 @@
 		"name": "Felix Schober",
 		"email": "github@felix-schober.de"
 	},
+	
 	"preview": true,
 	"publisher": "",
 	"repository": {
