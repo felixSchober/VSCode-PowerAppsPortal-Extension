@@ -160,3 +160,5 @@ Issues are tracked here: https://github.com/felixSchober/VSCode-PowerAppsPortal-
 
 Initial preview release of extension
 
+## Credits
+Icons made by [Freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
