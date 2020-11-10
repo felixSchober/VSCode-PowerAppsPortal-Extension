@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: update metadata in package.json
-        uses: onlyutkarsh/patch-files-action@v1.0.1
+        uses: onlyutkarsh/patch-files-action@v1.0.2
         with:
           files: '${{github.workspace}}/package.json'
           patch-syntax: |
