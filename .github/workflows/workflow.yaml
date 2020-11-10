@@ -20,13 +20,13 @@ jobs:
         run: git fetch --prune --unshallow
 
       - name: install gitversion tool
-        uses: gittools/actions/gitversion/setup@v0.9
+        uses: gittools/actions/gitversion/setup@v0.9.5
         with:
             versionSpec: '5.1.x'
       
       - name: execute gitversion
         id: gitversion # step id used as reference for output values
-        uses: gittools/actions/gitversion/execute@v0.9
+        uses: gittools/actions/gitversion/execute@v0.9.5
         
       - name: print gitversion
         run: |
@@ -37,7 +37,7 @@ jobs:
           echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
 
       - name: setup node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2.1.2
         with:
           node-version: '12.x'
         
@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: update metadata in package.json
-        uses: onlyutkarsh/patch-files-action@v1.0.1
+        uses: onlyutkarsh/patch-files-action@v1.0.2
         with:
           files: '${{github.workspace}}/package.json'
           patch-syntax: |
@@ -54,7 +54,7 @@ jobs:
             = /description => "Local source control for Power Apps portals code for web files like images or style sheets, web templates and content snippets."
       
       - name: add version in CHANGELOG.md
-        uses: cschleiden/replace-tokens@v1.0
+        uses: cschleiden/replace-tokens@v1
         with:
           files: '${{github.workspace}}/CHANGELOG.md'
         env:
@@ -68,7 +68,7 @@ jobs:
           echo "VSIX Path: ${{ env.vsix_path }}"
 
       - name: upload vsix as artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2.2.0
         with:
           name: powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
           path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix

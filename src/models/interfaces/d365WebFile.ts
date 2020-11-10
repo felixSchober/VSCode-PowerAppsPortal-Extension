@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 export interface ID365WebFile {
 	adx_webfileid: string | undefined;
 	adx_name: string;
