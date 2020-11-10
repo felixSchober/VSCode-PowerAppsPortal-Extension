@@ -4,7 +4,9 @@ import { env } from 'vscode';
 
 const keytar = getNodeModule<typeof keytarType>('keytar');
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 declare const __webpack_require__: typeof require;
+// eslint-disable-next-line @typescript-eslint/naming-convention
 declare const __non_webpack_require__: typeof require;
 
 function getNodeModule<T>(moduleName: string): T | undefined {
