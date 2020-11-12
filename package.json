@@ -147,7 +147,7 @@
 	},
 	"devDependencies": {
 		"@types/glob": "^7.1.3",
-		"@types/keytar": "4.0.1",
+		"@types/keytar": "4.4.2",
 		"@types/mime-types": "^2.1.0",
 		"@types/mocha": "^8.0.4",
 		"@types/node": "^12.11.7",
