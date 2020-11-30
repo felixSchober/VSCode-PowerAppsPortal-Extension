@@ -20,13 +20,13 @@ jobs:
         run: git fetch --prune --unshallow
 
       - name: install gitversion tool
-        uses: gittools/actions/gitversion/setup@v0.9.5
+        uses: gittools/actions/gitversion/setup@v0.9.7
         with:
             versionSpec: '5.1.x'
       
       - name: execute gitversion
         id: gitversion # step id used as reference for output values
-        uses: gittools/actions/gitversion/execute@v0.9.5
+        uses: gittools/actions/gitversion/execute@v0.9.7
         
       - name: print gitversion
         run: |
@@ -68,7 +68,7 @@ jobs:
           echo "VSIX Path: ${{ env.vsix_path }}"
 
       - name: upload vsix as artifact
-        uses: actions/upload-artifact@v2.2.0
+        uses: actions/upload-artifact@v2.2.1
         with:
           name: powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
           path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix

@@ -150,6 +150,7 @@ This extension uses the source control pane in Visual Studio Code to show change
 
 This limitation also applies to merge conflicts. Before committing your changes, always make sure you are using the most recent online file version. When you commit your files you are overwriting the origin file, not merging it.
 
+
 ## Known Issues
 
 Issues are tracked here: https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/issues
@@ -159,6 +160,11 @@ Issues are tracked here: https://github.com/felixSchober/VSCode-PowerAppsPortal-
 ### 0.1.0
 
 Initial preview release of extension
+
+### 0.1.5
+
+- Timeout for Dynamics API actions
+- Use of ***Request methods in Dynamics API for future proofing
 
 ## Credits
 Icons made by [Freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
