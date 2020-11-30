@@ -27,7 +27,7 @@ export class DynamicsApi {
 	d365InstanceName: string | undefined;
 	d365CrmRegion: string | undefined;
 	private configurationManager: ConfigurationManager;
-
+	private defaultRequestTimeout: number = 5000;
 	constructor(configurationManager: ConfigurationManager) {
 		this.configurationManager = configurationManager;
 		const adalConnect = this.getAdalConnection();
@@ -47,13 +47,16 @@ export class DynamicsApi {
 			collection: 'adx_websitelanguages',
 			select: ['adx_websitelanguageid', 'adx_name', '_adx_portallanguageid_value'],
 			filter: '_adx_websiteid_value eq ' + portalId,
-			timeout: 5000
+			timeout: this.defaultRequestTimeout,
 		};
-		const websiteLanguageResponse = await this.webApi.retrieveAllRequest<ID365WebsiteLanguage>(websiteLanguageRequest);
+		const websiteLanguageResponse = await this.webApi.retrieveAllRequest<ID365WebsiteLanguage>(
+			websiteLanguageRequest
+		);
 
 		const portalLanguageRequest: RetrieveMultipleRequest = {
 			collection: 'adx_portallanguages',
 			select: ['adx_languagecode', 'adx_displayname', 'adx_portallanguageid'],
+			timeout: this.defaultRequestTimeout,
 		};
 		const portalLanguageResponse = await this.webApi.retrieveAllRequest<ID365PortalLanguage>(portalLanguageRequest);
 
@@ -61,7 +64,9 @@ export class DynamicsApi {
 
 		for (const websiteLanguage of websiteLanguageResponse.value || []) {
 			// try get the matching portal language
-			const portalLanguage = portalLanguageResponse.value?.find(l => l.adx_portallanguageid === websiteLanguage._adx_portallanguageid_value);
+			const portalLanguage = portalLanguageResponse.value?.find(
+				(l) => l.adx_portallanguageid === websiteLanguage._adx_portallanguageid_value
+			);
 			if (portalLanguage) {
 				result.set(websiteLanguage.adx_websitelanguageid, portalLanguage);
 			} else {
@@ -78,7 +83,7 @@ export class DynamicsApi {
 		const request: RetrieveMultipleRequest = {
 			select: ['adx_websiteid', 'adx_name'],
 			collection: 'adx_websites',
-			timeout: 5000
+			timeout: this.defaultRequestTimeout,
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365Website>(request);
 		if (!response.value) {
@@ -92,10 +97,14 @@ export class DynamicsApi {
 	}
 
 	public async getPortalId(portalName: string): Promise<string> {
-		const select = ['adx_websiteid'];
-		const filter = `adx_name eq '${portalName}'`;
+		const request: RetrieveMultipleRequest = {
+			select: ['adx_websiteid'],
+			filter: `adx_name eq '${portalName}'`,
+			collection: 'adx_websites',
+			timeout: this.defaultRequestTimeout,
+		};
 
-		const response = await this.webApi.retrieveMultiple<ID365Website>('adx_websites', select, filter);
+		const response = await this.webApi.retrieveMultipleRequest<ID365Website>(request);
 
 		if (response.value?.length !== 1) {
 			throw Error(
@@ -109,17 +118,24 @@ export class DynamicsApi {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webpages',
 			select: WEBPAGE_SELECT,
-			filter: `_adx_websiteid_value eq ${portalId}`
+			filter: `_adx_websiteid_value eq ${portalId}`,
+			timeout: this.defaultRequestTimeout,
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365Webpage>(request);
 		return response.value || [];
 	}
 
 	public async getWebpageId(name: string, portalId: string): Promise<string> {
-		const select = ['adx_webpageid'];
 		const filter = `_adx_websiteid_value eq ${portalId} and adx_name eq '${name}' and adx_isroot eq true`;
 
-		const response = await this.webApi.retrieveMultiple<ID365Webpage>('adx_webpages', select, filter);
+		const request: RetrieveMultipleRequest = {
+			select: ['adx_webpageid'],
+			filter: filter,
+			collection: 'adx_webpages',
+			timeout: this.defaultRequestTimeout,
+		};
+
+		const response = await this.webApi.retrieveMultipleRequest<ID365Webpage>(request);
 
 		if (response.value?.length !== 1) {
 			throw Error(
@@ -131,14 +147,16 @@ export class DynamicsApi {
 	}
 
 	public async getPublishedPublishStateId(portalId: string): Promise<string> {
-		const select = ['adx_publishingstateid'];
 		const filter = `_adx_websiteid_value eq ${portalId} and adx_name eq 'Published'`;
 
-		const response = await this.webApi.retrieveMultiple<ID365PublishingState>(
-			'adx_publishingstates',
-			select,
-			filter
-		);
+		const request: RetrieveMultipleRequest = {
+			select: ['adx_publishingstateid'],
+			filter: `_adx_websiteid_value eq ${portalId} and adx_name eq 'Published'`,
+			collection: 'adx_publishingstates',
+			timeout: this.defaultRequestTimeout,
+		};
+
+		const response = await this.webApi.retrieveMultipleRequest<ID365PublishingState>(request);
 		if (!response || !response.value || response.value.length < 1) {
 			throw Error(`Found no publishing state for portal with id ${portalId}. Filter expression: ${filter}`);
 		}
@@ -155,6 +173,7 @@ export class DynamicsApi {
 			collection: 'adx_contentsnippets',
 			select: CONTENTSNIPPET_SELECT,
 			filter: '_adx_websiteid_value eq ' + websiteId,
+			timeout: this.defaultRequestTimeout,
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365ContentSnippet>(request);
 		if (!response.value || response.value?.length === 0) {
@@ -179,6 +198,7 @@ export class DynamicsApi {
 			entity: {
 				adx_value: update.source,
 			},
+			timeout: this.defaultRequestTimeout,
 		};
 
 		const c = await this.webApi.updateRequest<ID365ContentSnippet>(request);
@@ -194,18 +214,18 @@ export class DynamicsApi {
 	}
 
 	public async addContentSnippet(newSnippet: ID365ContentSnippet): Promise<ContentSnippet> {
-		
 		const contentSnippetCreateModel: any = {
 			adx_name: newSnippet.adx_name,
 			adx_value: newSnippet.adx_value,
 			'adx_contentsnippetlanguageid@odata.bind': `adx_websitelanguages(${newSnippet._adx_contentsnippetlanguageid_value})`,
-			'adx_websiteid@odata.bind': `adx_websites(${newSnippet._adx_websiteid_value})`
+			'adx_websiteid@odata.bind': `adx_websites(${newSnippet._adx_websiteid_value})`,
 		};
-		
+
 		const request: CreateRequest = {
 			collection: 'adx_contentsnippets',
 			entity: contentSnippetCreateModel,
 			returnRepresentation: true,
+			timeout: this.defaultRequestTimeout,
 		};
 
 		const c = await this.webApi.createRequest<ID365ContentSnippet>(request);
@@ -224,6 +244,7 @@ export class DynamicsApi {
 		const request: DeleteRequest = {
 			collection: 'adx_contentsnippets',
 			key: id,
+			timeout: this.defaultRequestTimeout,
 		};
 		await this.webApi.deleteRequest(request);
 	}
@@ -253,6 +274,7 @@ export class DynamicsApi {
 			entity: {
 				adx_source: update.source,
 			},
+			timeout: this.defaultRequestTimeout,
 		};
 
 		const result = await this.webApi.updateRequest<ID365WebTemplate>(request);
@@ -260,17 +282,17 @@ export class DynamicsApi {
 	}
 
 	public async addWebTemplate(newTemplate: ID365WebTemplate): Promise<WebTemplate> {
-
 		const contentSnippetCreateModel: any = {
 			adx_name: newTemplate.adx_name,
 			adx_source: newTemplate.adx_source,
-			'adx_websiteid@odata.bind': `adx_websites(${newTemplate._adx_websiteid_value})`
+			'adx_websiteid@odata.bind': `adx_websites(${newTemplate._adx_websiteid_value})`,
 		};
 
 		const request: CreateRequest = {
 			collection: 'adx_webtemplates',
 			entity: contentSnippetCreateModel,
 			returnRepresentation: true,
+			timeout: this.defaultRequestTimeout,
 		};
 
 		const result = await this.webApi.createRequest<ID365WebTemplate>(request);
@@ -281,6 +303,7 @@ export class DynamicsApi {
 		const request: DeleteRequest = {
 			collection: 'adx_webtemplates',
 			key: templateId,
+			timeout: this.defaultRequestTimeout,
 		};
 		await this.webApi.deleteRequest(request);
 	}
@@ -289,22 +312,28 @@ export class DynamicsApi {
 		const noteRequest: DeleteRequest = {
 			collection: 'annotations',
 			key: webNoteId,
+			timeout: this.defaultRequestTimeout,
 		};
 
 		const fileRequest: DeleteRequest = {
 			collection: 'adx_webfiles',
 			key: webFileId,
+			timeout: this.defaultRequestTimeout,
 		};
 		await this.webApi.deleteRequest(noteRequest);
 		await this.webApi.deleteRequest(fileRequest);
 	}
 
 	public async getWebFiles(portalId: string): Promise<Array<WebFile>> {
-		const select = ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value'];
-		const filter = '_adx_websiteid_value eq ' + portalId;
+		const request: RetrieveMultipleRequest = {
+			select: ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value'],
+			filter: '_adx_websiteid_value eq ' + portalId,
+			collection: 'adx_webfiles',
+			timeout: this.defaultRequestTimeout,
+		};
 
 		console.log('[D365 API] Getting web file');
-		const response = await this.webApi.retrieveMultiple<ID365WebFile>('adx_webfiles', select, filter);
+		const response = await this.webApi.retrieveAllRequest<ID365WebFile>(request);
 		if (!response.value) {
 			console.error("[D365 API] Couldn't get web files. Response value was empty.");
 			return [];
@@ -314,7 +343,9 @@ export class DynamicsApi {
 		const webFileNotes = await this.getWebFileNotes();
 
 		// create a map out of the web file notes with the key being the id of the corresponding webfile id.
-		const webFileNotesMap = new Map<string, ID365Note>(webFileNotes.map((note) => [note._objectid_value || '', note]));
+		const webFileNotesMap = new Map<string, ID365Note>(
+			webFileNotes.map((note) => [note._objectid_value || '', note])
+		);
 
 		let result: Array<WebFile> = [];
 
@@ -343,6 +374,7 @@ export class DynamicsApi {
 			collection: 'annotations',
 			filter: "objecttypecode eq 'adx_webfile' and isdocument eq true",
 			select: NOTE_SELECT,
+			timeout: this.defaultRequestTimeout,
 		};
 
 		const response = await this.webApi.retrieveAllRequest<ID365Note>(request);
@@ -359,14 +391,11 @@ export class DynamicsApi {
 		parentPageId: string,
 		publishingStateId: string
 	): Promise<WebFile> {
-
 		console.log(`\t[D365 API] Creating webfile ${note.filename}`);
 		const file = await this.createWebFile(note.filename, websiteId, parentPageId, publishingStateId);
 
 		if (!file.adx_webfileid) {
-			throw Error(
-				`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on object`
-			);
+			throw Error(`[D365 API] Webfile for file ${note.filename} was not created successfully -> no id on object`);
 		}
 
 		console.log(`\t[D365 API] Uploading contents to webfile ${note.filename}. File Id: ${file.adx_webfileid}`);
@@ -389,8 +418,16 @@ export class DynamicsApi {
 				mimetype: f.mimetype,
 			};
 
+			const request: UpdateRequest = {
+				collection: 'annotations',
+				entity: updatedImage,
+				key: f.annotationid,
+				returnRepresentation: false,
+				timeout: this.defaultRequestTimeout,
+			};
+
 			console.log(`\t[D365 API] Updating file ${f.filename} to D365`);
-			await this.webApi.update<boolean>(f.annotationid, 'annotations', updatedImage);
+			await this.webApi.updateRequest(request);
 			console.log('\t[D365 API] Updated file: ' + f.filename);
 			result.push(f);
 		}
@@ -412,13 +449,15 @@ export class DynamicsApi {
 			'adx_publishingstateid@odata.bind': `adx_publishingstates(${publishingStateId})`,
 		};
 
+		const request: CreateRequest = {
+			collection: 'adx_webfiles',
+			entity: file,
+			returnRepresentation: true,
+			timeout: this.defaultRequestTimeout,
+		};
+
 		console.log(`[D365 API] Adding web file ${file.adx_name} to D365`);
-		const requestResponse = await this.webApi.create<ID365WebFile>(
-			file,
-			'adx_webfiles',
-			['return=representation'],
-			select
-		);
+		const requestResponse = await this.webApi.createRequest<ID365WebFile>(request);
 
 		return requestResponse;
 	}
@@ -432,15 +471,15 @@ export class DynamicsApi {
 			mimetype: note.mimetype,
 			'objectid_adx_webfile@odata.bind': `adx_webfiles(${webfileId})`,
 		};
+		const request: CreateRequest = {
+			collection: 'annotations',
+			entity: noteToCreate,
+			returnRepresentation: true,
+			timeout: this.defaultRequestTimeout,
+		};
 
 		console.log(`[D365 API] Adding note ${noteToCreate.filename} to D365`);
-		const requestResponse = await this.webApi.create<ID365Note>(
-			noteToCreate,
-			'annotations',
-			['return=representation'],
-			select
-		);
-
+		const requestResponse = await this.webApi.createRequest<ID365Note>(request);
 		return requestResponse;
 	}
 
