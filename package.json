@@ -166,7 +166,7 @@
 	},
 	"dependencies": {
 		"adal-node": "^0.2.1",
-		"dynamics-web-api": "^1.6.14",
+		"dynamics-web-api": "^1.7.0",
 		"mime-types": "^2.1.27"
 	}
 }
