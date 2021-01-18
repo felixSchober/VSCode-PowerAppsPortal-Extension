@@ -31,6 +31,7 @@ import { ALL_FILES_GLOB } from './afs';
 import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 import * as mime from 'mime-types';
 import { DEFAULT_MIME_TYPE } from '../models/WebFile';
+import { PortalIgnoreConfigurationManager } from './portalIgnoreConfigurationManager';
 
 export class PowerAppsPortalSourceControl implements Disposable {
 	private portalScm: SourceControl;
@@ -41,6 +42,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private portalData!: PortalData;
 	private changedGroup: Set<Uri> = new Set<Uri>();
 	private changedResourceStates: Map<string, SourceControlResourceState> = new Map<string, SourceControlResourceState>();
+	private portalIgnoreConfigManager: PortalIgnoreConfigurationManager;
 
 	constructor(
 		context: ExtensionContext,
@@ -57,7 +59,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalScm.quickDiffProvider = this.portalRepository;
 		this.portalScm.inputBox.placeholder = 'This feature is not supported';
 		this.portalScm.inputBox.visible = false;
-
+		this.portalIgnoreConfigManager = new PortalIgnoreConfigurationManager();
 		context.subscriptions.push(this.portalScm);
 		this.registerFileSystemWatcher(context, workspaceFolder);
 	}
@@ -399,6 +401,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 					// if the current file is not a "portal file" ignore it
 					if (getFileType(uri) === PortalFileType.other) {
+						continue;
+					}
+
+					// check if file or file extension should be ignored
+					if (this.portalIgnoreConfigManager.isIgnored(uri)) {
+						console.log(`Ignore file ${uri.fsPath} because it's on the ignore list.`);
 						continue;
 					}
 

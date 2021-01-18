@@ -140,6 +140,11 @@ export function getFileType(uri: Uri): PortalFileType {
 	return PortalFileType.other;
 }
 
+export function getFileExtension(uri: Uri): string {
+	var ext = (uri.fsPath||'').split('.');
+    return ext[ext.length - 1];
+}
+
 export interface IPortalDocuments {
 	contentSnippet: Map<string, ContentSnippet>;
 	webFile: Map<string, WebFile>;
