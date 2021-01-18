@@ -166,5 +166,9 @@ Initial preview release of extension
 - Timeout for Dynamics API actions
 - Use of ***Request methods in Dynamics API for future proofing
 
+### 0.1.7
+
+- Ignore .DS_Store files
+
 ## Credits
 Icons made by [Freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
