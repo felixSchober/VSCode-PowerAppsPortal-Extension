@@ -102,9 +102,9 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 	/**
 	 * Creates a local file path in the local workspace that corresponds to the part of the
-	 * fiddle denoted by the given extension.
+	 * file denoted by the given extension.
 	 *
-	 * @param extension fiddle part, which is also used as a file extension
+	 * @param extension file part, which is also used as a file extension
 	 * @returns path of the locally cloned fiddle resource ending with the given extension
 	 */
 	async createLocalResourcePath(fileName: string, fileType: PortalFileType, portalDataFile?: IPortalDataDocument) {
