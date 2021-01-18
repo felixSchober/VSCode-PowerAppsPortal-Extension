@@ -166,7 +166,7 @@ Initial preview release of extension
 - Timeout for Dynamics API actions
 - Use of ***Request methods in Dynamics API for future proofing
 
-### 0.1.7
+### 0.1.8
 
 - Ignore .DS_Store files
 
