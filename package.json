@@ -161,12 +161,12 @@
 		"typescript": "^4.0.5",
 		"vsce": "^1.81.1",
 		"vscode-test": "^1.4.1",
-		"webpack": "^5.9.0",
+		"webpack": "^5.21.1",
 		"webpack-cli": "^4.2.0"
 	},
 	"dependencies": {
 		"adal-node": "^0.2.1",
-		"dynamics-web-api": "^1.6.14",
+		"dynamics-web-api": "^1.7.1",
 		"mime-types": "^2.1.27"
 	}
 }
