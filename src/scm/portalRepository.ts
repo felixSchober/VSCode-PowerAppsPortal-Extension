@@ -309,7 +309,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					message: progressMessage + `… Files `,
 				});
 
-				if (!this.configurationManager.defaultPageTemplate) {
+				if (this.configurationManager.useFoldersForWebFiles && !this.configurationManager.defaultPageTemplate) {
 					console.log('[REPO] default page template not set. Asking user.');
 					
 					// get default page template id

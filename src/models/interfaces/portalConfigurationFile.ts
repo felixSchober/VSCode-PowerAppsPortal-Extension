@@ -1,5 +1,5 @@
 export interface IPortalConfigurationFile {
 	portalId: string;
 	portalName: string;
-	defaultPageTemplateId: string
+	defaultPageTemplateId: string | undefined
 }

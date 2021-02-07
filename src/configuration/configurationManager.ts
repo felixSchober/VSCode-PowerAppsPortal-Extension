@@ -128,7 +128,7 @@ export class ConfigurationManager {
 		if (configFileExists) {
 			const data = await afs.readFile(configFilePath);
 			const config: IPortalConfigurationFile = <IPortalConfigurationFile>JSON.parse(data.toString(afs.UTF8));
-			if (!config || !config.portalId || !config.portalName || !config.defaultPageTemplateId) {
+			if (!config || !config.portalId || !config.portalName || (this.useFoldersForWebFiles && !config.defaultPageTemplateId)) {
 				console.warn(`[CONFIG] Portal config file exists but content is not valid: ${data.toString(afs.UTF8)}`);
 				return;
 			}
@@ -193,7 +193,7 @@ export class ConfigurationManager {
 	}
 
 	async storeConfigurationFile(): Promise<void> {
-		if (!this.portalId || !this.portalName || !this.defaultPageTemplate) {
+		if (!this.portalId || !this.portalName || (this.useFoldersForWebFiles && !this.defaultPageTemplate)) {
 			console.error('Could not store configuration file because portalId or portalName are not set.');
 			return;
 		}
