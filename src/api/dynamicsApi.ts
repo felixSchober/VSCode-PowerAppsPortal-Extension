@@ -18,6 +18,7 @@ import { ID365Webpage, WEBPAGE_SELECT } from '../models/interfaces/d365Webpage';
 import { ID365Website } from '../models/interfaces/d365Website';
 import { ID365WebTemplate, WEBTEMPLATE_SELECT } from '../models/interfaces/d365WebTemplate';
 import { WebFile } from '../models/WebFile';
+import { WebPage } from '../models/webPage';
 import { WebTemplate } from '../models/WebTemplate';
 import { CrmAdalConnectionSettings } from './adalConnection';
 
@@ -114,7 +115,8 @@ export class DynamicsApi {
 		const result = response.value[0].adx_websiteid;
 		return result;
 	}
-	public async getWebPages(portalId: string): Promise<Array<ID365Webpage>> {
+
+	public async getWebPageHierachy(portalId: string): Promise<Map<string, WebPage>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webpages',
 			select: WEBPAGE_SELECT,
@@ -122,7 +124,19 @@ export class DynamicsApi {
 			timeout: this.defaultRequestTimeout,
 		};
 		const response = await this.webApi.retrieveAllRequest<ID365Webpage>(request);
-		return response.value || [];
+
+		if (!response.value) {
+			return new Map<string, WebPage>();
+		}
+
+		const webPagesMap = new Map<string, ID365Webpage>(
+			response.value.map((webPage) => [webPage.adx_webpageid, webPage])
+		);
+
+		console.log('[D365 API] Constructing web page hierachy');
+		const webPageHierachy = WebPage.createWebPageHierachy(webPagesMap);
+
+		return webPageHierachy;
 	}
 
 	public async getWebpageId(name: string, portalId: string): Promise<string> {
@@ -326,7 +340,7 @@ export class DynamicsApi {
 
 	public async getWebFiles(portalId: string): Promise<Array<WebFile>> {
 		const request: RetrieveMultipleRequest = {
-			select: ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value'],
+			select: ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value', '_adx_parentpageid_value'],
 			filter: '_adx_websiteid_value eq ' + portalId,
 			collection: 'adx_webfiles',
 			timeout: this.defaultRequestTimeout,
@@ -347,6 +361,9 @@ export class DynamicsApi {
 			webFileNotes.map((note) => [note._objectid_value || '', note])
 		);
 
+		console.log('[D365 API] Getting web pages');
+		const webPageHierachy = await this.getWebPageHierachy(portalId);
+
 		let result: Array<WebFile> = [];
 
 		for (const webFile of response.value) {
@@ -363,7 +380,8 @@ export class DynamicsApi {
 				continue;
 			}
 
-			result.push(new WebFile(webFile, note));
+			const wf = WebFile.getWebFile(webFile, note, webPageHierachy);
+			result.push(wf);
 		}
 
 		return result;
@@ -372,7 +390,7 @@ export class DynamicsApi {
 	public async getWebFileNotes(): Promise<Array<ID365Note>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'annotations',
-			filter: "objecttypecode eq 'adx_webfile' and isdocument eq true",
+			filter: `objecttypecode eq 'adx_webfile' and isdocument eq true`,
 			select: NOTE_SELECT,
 			timeout: this.defaultRequestTimeout,
 		};
@@ -389,7 +407,8 @@ export class DynamicsApi {
 		note: ID365Note,
 		websiteId: string,
 		parentPageId: string,
-		publishingStateId: string
+		publishingStateId: string,
+		parentPage: WebPage
 	): Promise<WebFile> {
 		console.log(`\t[D365 API] Creating webfile ${note.filename}`);
 		const file = await this.createWebFile(note.filename, websiteId, parentPageId, publishingStateId);
@@ -402,7 +421,7 @@ export class DynamicsApi {
 		const createdNote = await this.createNote(note, file.adx_webfileid);
 
 		console.log('\t[D365 API] Uploaded file: ' + createdNote.filename);
-		return new WebFile(file, createdNote);
+		return new WebFile(file, createdNote, parentPage);
 	}
 
 	public async updateFiles(files: Array<ID365Note>): Promise<Array<ID365Note>> {

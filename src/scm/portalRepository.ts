@@ -23,6 +23,7 @@ import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 import { ID365WebTemplate } from '../models/interfaces/d365WebTemplate';
 import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365Note } from '../models/interfaces/d365Note';
+import { WebPage } from '../models/webPage';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -496,7 +497,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					this.portalData.publishedStateId = await this.d365WebApi.getPublishedPublishStateId(this.portalId);
 				}
 
-				const parentPageId = await this.chooseWebPage(fileName);
+				const parentPage = await this.getWebFileLocation(uri, fileName);
 				const localNewNote: ID365Note = {
 					documentbody: newFileContent,
 					filename: fileName,
@@ -509,8 +510,9 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				const remoteNewFile = await this.d365WebApi.uploadFile(
 					localNewNote,
 					this.portalId,
-					parentPageId,
-					this.portalData.publishedStateId
+					parentPage.id,
+					this.portalData.publishedStateId,
+					parentPage
 				);
 				this.portalData.data.webFile.set(remoteNewFile.d365Note.filename, remoteNewFile);
 				console.log(`\t[REPO] File ${remoteNewFile.d365Note.filename} was updated.`);
@@ -552,7 +554,17 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		return this.portalId;
 	}
 
-	private async chooseWebPage(fileName: string): Promise<string> {
+	private async getWebFileLocation(uri: Uri, filename: string): Promise<WebPage> {
+		// convential approach (ask which web page to use as parent)
+		if (!this.configurationManager.useFoldersForWebFiles) {
+			return await this.chooseWebPage(filename);
+		}
+
+		// derive web page from uri
+		throw Error('NOT IMPLEMENTED');
+	}
+
+	private async chooseWebPage(fileName: string): Promise<WebPage> {
 		if (!this.portalData) {
 			throw Error('Could not choose web page because portal data in repo class was not set.');
 		}
@@ -561,21 +573,22 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			throw Error('Could not choose web page because portal Id is not specified.');
 		}
 
-		if (this.portalData.webPages.length === 0) {
+		if (this.portalData.webPages.size === 0) {
 			console.log('[REPO] Uploading file but no web pages to choose from. Downloading web pages.');
-			this.portalData.webPages = await this.d365WebApi.getWebPages(this.portalId);
+			this.portalData.webPages = await this.d365WebApi.getWebPageHierachy(this.portalId);
 
 			// no result
-			if (this.portalData.webPages.length === 0) {
+			if (this.portalData.webPages.size === 0) {
 				throw Error(
 					'[REPO] Could not get web pages from portal. Result set is empty. Please make sure the portal has web pages.'
 				);
 			}
 		}
-		const webPageNames: Array<QuickPickItem> = this.portalData.webPages.map((webPage) => {
+		const webPagesFlatList = new Array<WebPage>(...this.portalData.webPages.values());
+		const webPageNames: Array<QuickPickItem> = webPagesFlatList.map((webPage) => {
 			const item: QuickPickItem = {
-				label: webPage.adx_name,
-				description: `.../${webPage.adx_partialurl}/${fileName}`,
+				label: webPage.name,
+				description: `${webPage.getFullPath()}/${fileName}`,
 			};
 			return item;
 		});
@@ -589,8 +602,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 
 		// resolve id
-		const result = this.portalData.webPages.find((webpage) => webpage.adx_name === webPageChoice.label)
-			?.adx_webpageid;
+		const result = webPagesFlatList.find((webpage) => webpage.name === webPageChoice.label);
 
 		if (!result) {
 			return await this.chooseWebPage(fileName);

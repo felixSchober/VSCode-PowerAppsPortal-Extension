@@ -2,6 +2,8 @@ import { ID365Note } from "./interfaces/d365Note";
 import { ID365WebFile } from "./interfaces/d365WebFile";
 import * as mime from 'mime-types';
 import { IPortalDataDocument } from "./interfaces/dataDocument";
+import { ID365Webpage } from "./interfaces/d365Webpage";
+import { WebPage } from "./webPage";
 
 export const DEFAULT_MIME_TYPE = 'application/octet-stream';
 
@@ -9,14 +11,24 @@ export class WebFile implements IPortalDataDocument {
 
 	public name: string;
 	public id: string;
+	public fullPath: string;
+	private _parentWebPage: WebPage | undefined;
 	private _d365File: ID365WebFile;
 	private _d365Note: ID365Note;
 
-	constructor(webFile: ID365WebFile, webNote: ID365Note) {
+	constructor(webFile: ID365WebFile, webNote: ID365Note, parentWebPage: WebPage | undefined) {
 		this.id = webFile.adx_webfileid || '';
 		this.name = webFile.adx_name;
 		this._d365Note = webNote;
 		this._d365File = webFile;
+		this._parentWebPage = parentWebPage;
+
+		if (!this._parentWebPage) {
+			this.fullPath = this.name;
+		} else {
+			this.fullPath = this._parentWebPage.getFullPath() + '/' + this.name;
+		}
+
 		if (!this._d365Note.mimetype || this._d365Note.mimetype === DEFAULT_MIME_TYPE) {
 			this._d365Note.mimetype = getMimeType(this._d365Note.filename);
 		}		
@@ -43,7 +55,14 @@ export class WebFile implements IPortalDataDocument {
 		return this._d365File;
 	}
 
-	
+	public static getWebFile(webFile: ID365WebFile, webNote: ID365Note, webPageHierachy: Map<string, WebPage>): WebFile {
+		let parentPage: WebPage | undefined = undefined;
+		if (webFile._adx_parentpageid_value && webPageHierachy.has(webFile._adx_parentpageid_value)) {
+			parentPage = webPageHierachy.get(webFile._adx_parentpageid_value);
+		}
+
+		return new WebFile(webFile, webNote, parentPage);
+	}
 }
 
 export function getMimeType(fileName: string): string {

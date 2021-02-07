@@ -6,7 +6,7 @@ import { WebTemplate } from './WebTemplate';
 import path = require('path');
 import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from '../scm/portalRepository';
 import { ID365PortalLanguage } from './interfaces/d365Language';
-import { ID365Webpage } from './interfaces/d365Webpage';
+import { WebPage } from './webPage';
 
 export class PortalData {
 	public instanceName: string;
@@ -14,12 +14,12 @@ export class PortalData {
 	public data: IPortalDocuments;
 	public languages = new Map<string, ID365PortalLanguage>();
 	public publishedStateId: string | undefined;
-	public webPages: Array<ID365Webpage>;
+	public webPages: Map<string, WebPage>;
 
 	constructor(instanceName: string, portalName: string) {
 		this.instanceName = instanceName;
 		this.portalName = portalName;
-		this.webPages = new Array<ID365Webpage>();
+		this.webPages = new Map<string, WebPage>();
 
 		this.data = {
 			contentSnippet: new Map<string, ContentSnippet>(),
@@ -34,7 +34,6 @@ export class PortalData {
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				// fileName = fileName.replace(/_/g, '/');
 				return this.data.contentSnippet.has(fileName);
 			case PortalFileType.webTemplate:
 				return this.data.webTemplate.has(fileName);

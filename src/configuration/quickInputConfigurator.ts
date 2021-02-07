@@ -40,7 +40,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	];
 
 	const yesNo: QuickPickItem[] = [
-		{label: 'yes'},
+		{label: 'yes', description: 'experimental'},
 		{label: 'no'}
 	];
 

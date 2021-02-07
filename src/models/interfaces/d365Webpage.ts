@@ -3,6 +3,7 @@ export interface ID365Webpage {
 	adx_webpageid: string;
 	adx_name: string;
 	adx_partialurl: string;
+	_adx_parentpageid_value: string;
 }
 
-export const WEBPAGE_SELECT = ['adx_webpageid', 'adx_name', 'adx_partialurl'];
+export const WEBPAGE_SELECT = ['adx_webpageid', 'adx_name', 'adx_partialurl', '_adx_parentpageid_value'];
