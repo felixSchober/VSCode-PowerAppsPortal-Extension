@@ -108,6 +108,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// also, this helps activating the extension on future runs.
 		configurationManager.portalId = portalScm.portalRepository.portalId;
 		configurationManager.portalName = portalScm.portalRepository.portalName;
+		configurationManager.defaultPageTemplate = portalScm.portalRepository.defaultPageTemplate;
 		await configurationManager.storeConfigurationFile();
 
 		portalScm.portalData = portalData;

@@ -12,6 +12,7 @@ import { ContentSnippet } from '../models/ContentSnippet';
 import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
 import { ID365Note, NOTE_SELECT } from '../models/interfaces/d365Note';
+import { ID365PageTemplate, PAGETEMPLATE_SELECT } from '../models/interfaces/d365PageTemplate';
 import { ID365PublishingState } from '../models/interfaces/d365PublishingState';
 import { ID365WebFile } from '../models/interfaces/d365WebFile';
 import { ID365Webpage, WEBPAGE_SELECT } from '../models/interfaces/d365Webpage';
@@ -116,7 +117,7 @@ export class DynamicsApi {
 		return result;
 	}
 
-	public async getWebPageHierachy(portalId: string): Promise<Map<string, WebPage>> {
+	public async getWebPageHierarchy(portalId: string): Promise<Map<string, WebPage>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webpages',
 			select: WEBPAGE_SELECT,
@@ -133,10 +134,10 @@ export class DynamicsApi {
 			response.value.map((webPage) => [webPage.adx_webpageid, webPage])
 		);
 
-		console.log('[D365 API] Constructing web page hierachy');
-		const webPageHierachy = WebPage.createWebPageHierachy(webPagesMap);
+		console.log('[D365 API] Constructing web page hierarchy');
+		const webPageHierarchy = WebPage.createWebPageHierarchy(webPagesMap);
 
-		return webPageHierachy;
+		return webPageHierarchy;
 	}
 
 	public async getWebpageId(name: string, portalId: string): Promise<string> {
@@ -158,6 +159,35 @@ export class DynamicsApi {
 		}
 		const result = response.value[0].adx_webpageid;
 		return result;
+	}
+
+	public async createWebPage(newWebPage: Partial<ID365Webpage>): Promise<ID365Webpage> {
+		const webPageCreateModel: any = {
+			adx_name: newWebPage.adx_name,
+			adx_partialurl: newWebPage.adx_partialurl,
+			adx_hiddenfromsitemap: newWebPage.adx_hiddenfromsitemap,
+			'adx_publishingstateid@odata.bind': `adx_publishingstates(${newWebPage._adx_publishingstateid_value})`,
+			'adx_pagetemplateid@odata.bind': `adx_pagetemplates(${newWebPage._adx_pagetemplateid_value})`,
+			'adx_websiteid@odata.bind': `adx_websites(${newWebPage._adx_websiteid_value})`,
+		};
+
+		if (newWebPage._adx_parentpageid_value) {
+			webPageCreateModel['adx_parentpageid@odata.bind'] = `adx_webpages(${newWebPage._adx_parentpageid_value})`;
+
+		}
+
+		const request: CreateRequest = {
+			collection: 'adx_webpages',
+			entity: webPageCreateModel,
+			returnRepresentation: true,
+			timeout: this.defaultRequestTimeout,
+		};
+
+		const createdWebPage = await this.webApi.createRequest<ID365Webpage>(request);
+		if (!createdWebPage.adx_webpageid) {
+			throw Error('Id of webpage from dynamics api was not defined. (04)');
+		}
+		return createdWebPage;
 	}
 
 	public async getPublishedPublishStateId(portalId: string): Promise<string> {
@@ -263,6 +293,21 @@ export class DynamicsApi {
 		await this.webApi.deleteRequest(request);
 	}
 
+	public async getPageTemplates(websiteId: string): Promise<Array<ID365PageTemplate>> {
+		const request: RetrieveMultipleRequest = {
+			collection: 'adx_pagetemplates',
+			select: PAGETEMPLATE_SELECT,
+			filter: '_adx_websiteid_value eq ' + websiteId,
+		};
+
+		const response = await this.webApi.retrieveAllRequest<ID365PageTemplate>(request);
+		if (!response.value || response.value?.length === 0) {
+			throw Error(`Could not get page templates from dynamics instance for website with id ${websiteId}.`);
+		}
+
+		return response.value;
+	}
+
 	public async getWebTemplates(websiteId: string): Promise<Array<WebTemplate>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webtemplates',
@@ -338,7 +383,7 @@ export class DynamicsApi {
 		await this.webApi.deleteRequest(fileRequest);
 	}
 
-	public async getWebFiles(portalId: string): Promise<Array<WebFile>> {
+	public async getWebFiles(portalId: string, webPageHierarchy: Map<string, WebPage>): Promise<Array<WebFile>> {
 		const request: RetrieveMultipleRequest = {
 			select: ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value', '_adx_parentpageid_value'],
 			filter: '_adx_websiteid_value eq ' + portalId,
@@ -361,9 +406,6 @@ export class DynamicsApi {
 			webFileNotes.map((note) => [note._objectid_value || '', note])
 		);
 
-		console.log('[D365 API] Getting web pages');
-		const webPageHierachy = await this.getWebPageHierachy(portalId);
-
 		let result: Array<WebFile> = [];
 
 		for (const webFile of response.value) {
@@ -380,7 +422,7 @@ export class DynamicsApi {
 				continue;
 			}
 
-			const wf = WebFile.getWebFile(webFile, note, webPageHierachy);
+			const wf = WebFile.getWebFile(webFile, note, webPageHierarchy);
 			result.push(wf);
 		}
 

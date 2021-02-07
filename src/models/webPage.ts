@@ -24,15 +24,15 @@ export class WebPage {
 		return this.parent.getFullPath() + '/' + this.url;
 	}
 
-	public static createWebPageHierachy(d365WebPages: Map<string, ID365Webpage>): Map<string, WebPage> {
+	public static createWebPageHierarchy(d365WebPages: Map<string, ID365Webpage>): Map<string, WebPage> {
 		const createdPages: Map<string, WebPage> = new Map<string, WebPage>();
 	
-		// create intial web pages
+		// create initial web pages
 		for (const d365WebPage of d365WebPages.values()) {
 			createdPages.set(d365WebPage.adx_webpageid, new WebPage(d365WebPage));
 		}
 	
-		// build page hierachy
+		// build page hierarchy
 		for (const webPage of createdPages.values()) {
 			// skip page. Page has no parent
 			if (!webPage.parentId) {
@@ -48,5 +48,20 @@ export class WebPage {
 		}
 	
 		return createdPages;
+	}
+
+	public static addWebPagesToPageHierarchy(existingPages: Map<string, WebPage>, newD365WebPage: ID365Webpage): WebPage {
+		const newWebPage = new WebPage(newD365WebPage);
+		existingPages.set(newWebPage.id, newWebPage);
+
+		if (newWebPage.parentId) {
+			if (!existingPages.has(newWebPage.parentId)) {
+				console.warn(`Couldn't resolve parent for page ${newWebPage.name}. Parent Id: ${newWebPage.parentId}`);
+				return newWebPage;
+			}
+			newWebPage.parent = existingPages.get(newWebPage.parentId);
+		}
+
+		return newWebPage;
 	}
 }

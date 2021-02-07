@@ -57,10 +57,10 @@ export class WebFile implements IPortalDataDocument {
 		return this._d365File;
 	}
 
-	public static getWebFile(webFile: ID365WebFile, webNote: ID365Note, webPageHierachy: Map<string, WebPage>): WebFile {
+	public static getWebFile(webFile: ID365WebFile, webNote: ID365Note, webPageHierarchy: Map<string, WebPage>): WebFile {
 		let parentPage: WebPage | undefined = undefined;
-		if (webFile._adx_parentpageid_value && webPageHierachy.has(webFile._adx_parentpageid_value)) {
-			parentPage = webPageHierachy.get(webFile._adx_parentpageid_value);
+		if (webFile._adx_parentpageid_value && webPageHierarchy.has(webFile._adx_parentpageid_value)) {
+			parentPage = webPageHierarchy.get(webFile._adx_parentpageid_value);
 		}
 
 		return new WebFile(webFile, webNote, parentPage);

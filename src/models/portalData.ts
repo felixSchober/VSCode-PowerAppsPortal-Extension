@@ -79,6 +79,40 @@ export class PortalData {
 		return this.data.webFile.get(fileName);
 	}
 
+	public getRootWebPage(): WebPage | undefined {
+		if (this.webPages.size === 0) {
+			return undefined;
+		}
+
+		for (const page of this.webPages.values()) {
+			if (!page.parentId) {
+				return page;
+			}
+		}
+
+		return undefined;
+	}
+
+	public getWebPage(uri: Uri): WebPage | undefined {
+		const folders = path.dirname(uri.fsPath).split(path.sep);
+		return this.getWebPageFromPartialFilePath(folders);
+	}
+
+	public getWebPageFromPartialFilePath(folders: string[]): WebPage | undefined {
+		const folderName = folders[folders.length - 1];
+
+		// try to find this web page based on folder name
+		let parentWebPage: WebPage | undefined;
+		for (const webPage of this.webPages.values()) {
+			if (webPage.url === folderName) {
+				parentWebPage = webPage;
+				break;
+			}
+		}
+
+		return parentWebPage;
+	}
+
 	public getLanguageFromPath(uri: Uri): string {
 		// return language id based on the path
 

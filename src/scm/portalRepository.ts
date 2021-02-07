@@ -24,6 +24,8 @@ import { ID365WebTemplate } from '../models/interfaces/d365WebTemplate';
 import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365Note } from '../models/interfaces/d365Note';
 import { WebPage } from '../models/webPage';
+import { ID365Webpage } from '../models/interfaces/d365Webpage';
+import { ID365PageTemplate } from '../models/interfaces/d365PageTemplate';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -36,6 +38,8 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	private d365WebApi: DynamicsApi;
 	public portalName: string | undefined;
 	public portalId: string | undefined;
+	public defaultPageTemplate: string | undefined;
+
 	private portalData: PortalData | undefined;
 	public languages: Map<string, ID365PortalLanguage>;
 	private isDownloadCanceled: boolean;
@@ -143,6 +147,8 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 							console.error(`Could not create folder ${webFilePath}`);
 							throw Error(`Could not create folder ${webFilePath}`);
 						}
+
+						return path.join(webFilePath, fileName);
 					}
 				}				
 
@@ -185,6 +191,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					portalId = this.configurationManager.portalId;
 					this.portalName = this.configurationManager.portalName;
 					this.portalId = portalId;
+					this.defaultPageTemplate = this.configurationManager.defaultPageTemplate;
 				}
 
 				if (!portalId) {
@@ -257,7 +264,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				}
 				progressMessage += `✓ Templates: ${webTemplates.length}`;
 				progress.report({
-					increment: 25,
+					increment: 20,
 					message: progressMessage + `… Content Snippets `,
 				});
 
@@ -292,7 +299,28 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				const webFiles = await this.d365WebApi.getWebFiles(portalId);
+
+				// get web pages				
+				console.log('[REPO] Getting web pages');
+				const webPageHierarchy = await this.d365WebApi.getWebPageHierarchy(portalId);
+				result.webPages = webPageHierarchy;
+				progress.report({
+					increment: 5,
+					message: progressMessage + `… Files `,
+				});
+
+				if (!this.configurationManager.defaultPageTemplate) {
+					console.log('[REPO] default page template not set. Asking user.');
+					
+					// get default page template id
+					this.defaultPageTemplate = await this.chooseDefaultWebTemplateId(portalId, undefined);
+					console.log('[REPO] default page template id set: ' + this.defaultPageTemplate);
+				}
+
+				if (this.isDownloadCanceled) {
+					return result;
+				}
+				const webFiles = await this.d365WebApi.getWebFiles(portalId, webPageHierarchy);
 				for (const file of webFiles) {
 					if (!file || !file.d365Note) {
 						console.error(`Could not get a file.`);
@@ -300,7 +328,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					result.data.webFile.set(file.d365Note.filename.toLowerCase(), file);
 				}
 
-				progressMessage += `✓ Files: ${webTemplates.length} `;
+				progressMessage += `✓ Files: ${webFiles.length} `;
 				progress.report({
 					increment: 25,
 					message: progressMessage,
@@ -560,6 +588,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 		const portalChoice = await window.showQuickPick(new Array(...portals.keys()), {
 			placeHolder: 'Select Portal',
+			canPickMany: false,
 			ignoreFocusOut: true,
 		});
 
@@ -572,14 +601,140 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		return this.portalId;
 	}
 
+	private async chooseDefaultWebTemplateId(portalId: string, pageTemplates: Array<ID365PageTemplate> | undefined): Promise<string> {
+		if (!pageTemplates) {
+			try {
+				pageTemplates = await this.d365WebApi.getPageTemplates(portalId);
+			} catch (error) {
+				window.showErrorMessage(`Could not get page template data: ${JSON.stringify(error)}`);
+				return '';
+			}
+		}
+		
+		const pageTemplateChoices: QuickPickItem[] = pageTemplates.map((template) => {
+			return {
+				label: template.adx_name
+			};
+		});
+
+		const webTemplateChoice = await window.showQuickPick(pageTemplateChoices, {
+			canPickMany: false,
+			ignoreFocusOut: true,
+			placeHolder: 'Select a default page template which is used for new web file paths. Recommendation: \'Page\'. This setting only has an impact if folders for web files is enabled.',
+		 });
+
+		 const pickedTemplate = pageTemplates.find((t) => t.adx_name === webTemplateChoice?.label);
+		 if (pickedTemplate) {
+			 return pickedTemplate.adx_pagetemplateid;
+		 }
+		 window.showErrorMessage(`Could not get find id for page template. Please choose a different template.`);
+
+		 return await this.chooseDefaultWebTemplateId(portalId, pageTemplates);
+	}
+
 	private async getWebFileLocation(uri: Uri, filename: string): Promise<WebPage> {
-		// convential approach (ask which web page to use as parent)
+		// conventional approach (ask which web page to use as parent)
 		if (!this.configurationManager.useFoldersForWebFiles) {
 			return await this.chooseWebPage(filename);
 		}
 
+
 		// derive web page from uri
-		throw Error('NOT IMPLEMENTED');
+		const parentWebPage = this.portalData?.getWebPage(uri);
+
+		if (parentWebPage) {
+			return parentWebPage;
+		}
+
+		// web page does not exist (yet)
+		console.log(`[REPO] Could not find preexisting web page for uri ${uri.fsPath}. Creating new web file(s).`);
+
+		return await this.createPartialWebPagePath(uri);
+	}
+
+	private async createPartialWebPagePath(uri: Uri): Promise<WebPage> {
+		const folders = path.dirname(uri.fsPath).split(path.sep);
+
+		const webPagesToCreate: Array<Partial<ID365Webpage>> = new Array<Partial<ID365Webpage>>();
+
+		// find first matching web page or root path
+
+		while(folders.length > 0) {
+			const currentWebPageName = folders[folders.length - 1];
+
+			// stop if root is reached
+			if (currentWebPageName === FOLDER_WEB_FILES) {
+				const rootPage = this.portalData?.getRootWebPage();
+
+				// could not find root page
+				if(!rootPage) {
+					break;
+				}
+
+				// set prev. last web page with root page
+				const lastWebPage = webPagesToCreate[webPagesToCreate.length - 1];
+				lastWebPage._adx_parentpageid_value = rootPage.id;
+				break;				
+			}
+
+			let potentialWebPage = this.portalData?.getWebPageFromPartialFilePath(folders);
+
+			// web page not found
+			if (!potentialWebPage) {
+				const toCreate: Partial<ID365Webpage> = {
+					// eslint-disable-next-line @typescript-eslint/naming-convention
+					adx_name: currentWebPageName, // eslint-disable-next-line @typescript-eslint/naming-convention
+					adx_partialurl: currentWebPageName, // eslint-disable-next-line @typescript-eslint/naming-convention		
+					_adx_pagetemplateid_value: this.configurationManager.defaultPageTemplate, // eslint-disable-next-line @typescript-eslint/naming-convention					
+					_adx_publishingstateid_value: this.portalData?.publishedStateId, // eslint-disable-next-line @typescript-eslint/naming-convention
+					_adx_parentpageid_value: undefined, // eslint-disable-next-line @typescript-eslint/naming-convention
+					_adx_websiteid_value: this.portalId,// eslint-disable-next-line @typescript-eslint/naming-convention
+					adx_hiddenfromsitemap: true
+				};
+				webPagesToCreate.push(toCreate);
+			} else {
+				const lastWebPage = webPagesToCreate[webPagesToCreate.length - 1];
+				if (lastWebPage) {
+					lastWebPage._adx_parentpageid_value = potentialWebPage.id;
+					break;
+				}				
+			}
+
+			folders.pop();
+		}
+
+		// constructed web page hierarchy finished
+		let prevParentId: string | undefined = webPagesToCreate[webPagesToCreate.length - 1]?._adx_parentpageid_value;
+		let lastWebPage: WebPage | undefined;
+		while(webPagesToCreate.length > 0) {
+			const webPageToCreate = webPagesToCreate.pop();
+
+			if (!webPageToCreate) {
+				break;
+			}
+
+			if (prevParentId) {
+				webPageToCreate._adx_parentpageid_value = prevParentId;
+			}
+
+			let newWebPage: ID365Webpage | undefined;
+			try {
+				newWebPage = await this.d365WebApi.createWebPage(webPageToCreate);
+			} catch (error) {
+				window.showErrorMessage(`Could not create partial web page path element ${webPageToCreate.adx_partialurl}. Error: ${JSON.stringify(error)}`);
+				throw error;
+			}
+
+			console.log('[REPO] Created web page: ' + newWebPage.adx_name);
+			prevParentId = newWebPage.adx_webpageid;
+			lastWebPage = WebPage.addWebPagesToPageHierarchy(this.portalData?.webPages || new Map<string, WebPage>(), newWebPage);;
+		}
+
+		if (!lastWebPage) {
+			throw Error('Could not create web pages to upload web files. Please try to create a file path hierarchy in Dynamics first.');
+		}
+
+		return lastWebPage;
 	}
 
 	private async chooseWebPage(fileName: string): Promise<WebPage> {
@@ -593,7 +748,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 		if (this.portalData.webPages.size === 0) {
 			console.log('[REPO] Uploading file but no web pages to choose from. Downloading web pages.');
-			this.portalData.webPages = await this.d365WebApi.getWebPageHierachy(this.portalId);
+			this.portalData.webPages = await this.d365WebApi.getWebPageHierarchy(this.portalId);
 
 			// no result
 			if (this.portalData.webPages.size === 0) {

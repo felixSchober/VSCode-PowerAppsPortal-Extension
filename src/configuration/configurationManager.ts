@@ -16,6 +16,7 @@ export class ConfigurationManager {
 	credentialManager: CredentialManager | undefined;
 	portalId: string | undefined;
 	portalName: string | undefined;
+	defaultPageTemplate: string | undefined;
 	useFoldersForWebFiles: boolean | undefined;
 
 	constructor(private readonly workspaceFolder: WorkspaceFolder) {
@@ -127,13 +128,14 @@ export class ConfigurationManager {
 		if (configFileExists) {
 			const data = await afs.readFile(configFilePath);
 			const config: IPortalConfigurationFile = <IPortalConfigurationFile>JSON.parse(data.toString(afs.UTF8));
-			if (!config || !config.portalId || !config.portalName) {
+			if (!config || !config.portalId || !config.portalName || !config.defaultPageTemplateId) {
 				console.warn(`[CONFIG] Portal config file exists but content is not valid: ${data.toString(afs.UTF8)}`);
 				return;
 			}
 
 			this.portalId = config.portalId;
 			this.portalName = config.portalName;
+			this.defaultPageTemplate = config.defaultPageTemplateId;
 
 			console.log(`[CONFIG] Restored portal name and id with config file.`);
 		}
@@ -191,14 +193,15 @@ export class ConfigurationManager {
 	}
 
 	async storeConfigurationFile(): Promise<void> {
-		if (!this.portalId || !this.portalName) {
+		if (!this.portalId || !this.portalName || !this.defaultPageTemplate) {
 			console.error('Could not store configuration file because portalId or portalName are not set.');
 			return;
 		}
 
 		const config: IPortalConfigurationFile = {
 			portalId: this.portalId,
-			portalName: this.portalName
+			portalName: this.portalName,
+			defaultPageTemplateId: this.defaultPageTemplate
 		};
 		const configString = JSON.stringify(config);
 		const configFilePath = this.getConfigurationFilePath();
