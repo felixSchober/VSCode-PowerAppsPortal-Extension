@@ -110,6 +110,11 @@
 					"type": "string",
 					"default": "",
 					"description": "Client Id of your AAD app registration e.g. 65f4ee4c-bbec-4059-b2ce-05e8e8acc679"
+				},
+				"powerappsPortals.useFoldersForFiles": {
+					"type": "boolean",
+					"default": false,
+					"description": "Specifies if the extension should use folders for web files instead of putting it all in one folder (default)"
 				}
 			}
 		},

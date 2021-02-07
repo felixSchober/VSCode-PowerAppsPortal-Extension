@@ -1,12 +1,13 @@
 import { ExtensionContext, window, workspace, WorkspaceFolder } from 'vscode';
 import { IPortalConfigurationFile } from '../models/interfaces/portalConfigurationFile';
 import { CredentialManager } from './credentialManager';
-import { multiStepInput } from './quickInputConfigurator';
+import { ConfigurationState, multiStepInput } from './quickInputConfigurator';
 import * as afs from '../scm/afs';
 import path = require('path');
 
 
 export const PORTAL_CONFIGURATION_FILE = ".portal";
+export const PORTAL_SETTING_PREFIX_ID = "powerappsPortals";
 
 export class ConfigurationManager {
 
@@ -15,6 +16,7 @@ export class ConfigurationManager {
 	credentialManager: CredentialManager | undefined;
 	portalId: string | undefined;
 	portalName: string | undefined;
+	useFoldersForWebFiles: boolean | undefined;
 
 	constructor(private readonly workspaceFolder: WorkspaceFolder) {
 	}
@@ -94,9 +96,10 @@ export class ConfigurationManager {
 		let aadClientId: string | undefined;
 		let aadTenantId: string | undefined; 
 		try {
-			const configuration = workspace.getConfiguration('powerappsPortals');
+			const configuration = workspace.getConfiguration(PORTAL_SETTING_PREFIX_ID);
 			this.d365InstanceName = configuration.get<string>('dynamicsInstanceName');
 			this.d365CrmRegion = configuration.get<string>('dynamicsCrmRegion');
+			this.useFoldersForWebFiles = configuration.get<boolean>('useFoldersForFiles') || false;
 
 			aadClientId = configuration.get<string>('aadClientId');
 			aadTenantId = configuration.get<string>('aadTenantId');
@@ -137,9 +140,26 @@ export class ConfigurationManager {
 	}
 
 	private async configure(context: ExtensionContext) {
-		const config = await multiStepInput(context);
+
+		let config: ConfigurationState | undefined = undefined;
+		try {
+			config = await multiStepInput(context);
+		} catch (error) {
+			window.showInformationMessage('Power Apps Portal configuration canceled.');
+			if (error.message === 'canceled') {
+				return;
+			}
+			console.error('Could not get user configuration: ' + error);
+		}
+
+		if (!config) {
+			window.showErrorMessage('Could not get configuration for Portal connection. Please try again.');
+			return;
+		}
+		
 
 		this.d365InstanceName = config.instanceName;
+		this.useFoldersForWebFiles = config.useFoldersForFiles;
 		
 		if (typeof config.crmRegion === 'string') {
 			this.d365CrmRegion = config.crmRegion;
@@ -162,11 +182,12 @@ export class ConfigurationManager {
 			throw Error('Could not store configuration because connection values are not specified');
 		}
 
-		await workspace.getConfiguration().update('powerappsPortals.aadTenantId', this.credentialManager.aadTenantId);
-		await workspace.getConfiguration().update('powerappsPortals.aadClientId', this.credentialManager.aadClientId);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.aadTenantId', this.credentialManager.aadTenantId);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.aadClientId', this.credentialManager.aadClientId);
 
-		await workspace.getConfiguration().update('powerappsPortals.dynamicsInstanceName', this.d365InstanceName);
-		await workspace.getConfiguration().update('powerappsPortals.dynamicsCrmRegion', this.d365CrmRegion);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.dynamicsInstanceName', this.d365InstanceName);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.dynamicsCrmRegion', this.d365CrmRegion);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.useFoldersForFiles', this.useFoldersForWebFiles);
 	}
 
 	async storeConfigurationFile(): Promise<void> {
