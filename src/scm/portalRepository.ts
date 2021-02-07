@@ -128,6 +128,24 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 			case PortalFileType.webFile:
 				fileTypePath = FOLDER_WEB_FILES;
+
+				// should we create folders?
+				if (this.configurationManager.useFoldersForWebFiles) {
+					// get actual file
+					const webFile = this.portalData?.data.webFile.get(fileName);
+
+					if (webFile) {
+						const webFilePath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, webFile.filePath);
+
+						try {
+							await createFolder(webFilePath);
+						} catch (error) {
+							console.error(`Could not create folder ${webFilePath}`);
+							throw Error(`Could not create folder ${webFilePath}`);
+						}
+					}
+				}				
+
 				return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName);
 
 			case PortalFileType.webTemplate:
