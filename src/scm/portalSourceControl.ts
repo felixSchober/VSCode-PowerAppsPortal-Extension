@@ -47,6 +47,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	>();
 	private portalIgnoreConfigManager: PortalIgnoreConfigurationManager;
 	private useFoldersForWebFiles: boolean;
+	private runPeriodicFetches: boolean;
+	private periodicFetchInterval: NodeJS.Timeout | undefined;
 
 	constructor(
 		context: ExtensionContext,
@@ -64,16 +66,18 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalScm.inputBox.placeholder = 'This feature is not supported';
 		this.portalScm.inputBox.visible = false;
 		this.useFoldersForWebFiles = configurationManager.useFoldersForWebFiles || false;
+		this.runPeriodicFetches = configurationManager.runPeriodicFetches || true;
+		this.periodicFetchInterval = undefined;
 		this.portalIgnoreConfigManager = new PortalIgnoreConfigurationManager();
 		context.subscriptions.push(this.portalScm);
 		this.registerFileSystemWatcher(context, workspaceFolder);
 	}
 
-	private async downloadData(): Promise<PortalData> {
+	private async downloadData(silent: boolean): Promise<PortalData> {
 		this.refreshStatusBar('$(sync~spin)', `Portal: Downloading`);
 		let result: PortalData;
 		try {
-			result = await this.portalRepository.download();
+			result = await this.portalRepository.download(silent);
 		} catch (error) {
 			this.refreshStatusBar('$(dialog-error)', `Portal: Download Error`);
 			window.showErrorMessage(`Could not download portal data: ${error}`);
@@ -96,7 +100,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		let portalData: PortalData;
 
 		try {
-			portalData = await portalScm.downloadData();
+			portalData = await portalScm.downloadData(false);
 		} catch (error) {
 			throw new Error(`[SCM] Could not download portal data: ${error}`);
 		}
@@ -180,6 +184,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			}
 
 			window.showInformationMessage(`Data uploaded`, { modal: false });
+			this.refresh(true);
 		}
 	}
 
@@ -321,7 +326,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			);
 		} else {
 			try {
-				const newPortalData = await this.downloadData();
+				const newPortalData = await this.downloadData(false);
 
 				// force set data (overwrite = true)
 				await this.setPortalData(newPortalData, true);
@@ -331,13 +336,24 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		}
 	}
 
+	// Refreshes the portal data if runPeriodicFetches is true
+	public initializePeriodicFetch() {
+		if (this.runPeriodicFetches && !this.periodicFetchInterval) {
+			console.log('[SCM] Periodic data fetching enabled');
+			this.periodicFetchInterval = setInterval(async () => {
+				console.log('[SCM] Trigger silent portal data fetch');
+				await this.refresh(true);
+			}, 120000);
+		}
+	}
+
 	/**
 	 * Refresh is used when the information on the server may have changed.
 	 * For example another user updates the Fiddle online.
 	 */
-	async refresh(): Promise<void> {
+	public async refresh(silent: boolean): Promise<void> {
 		try {
-			const latestPortalData = await this.downloadData();
+			const latestPortalData = await this.downloadData(silent);
 			await this.setPortalData(latestPortalData, false);
 		} catch (ex) {
 			window.showErrorMessage(ex);

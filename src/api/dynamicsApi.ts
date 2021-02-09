@@ -4,7 +4,6 @@ import {
 	CreateRequest,
 	DeleteRequest,
 	RetrieveMultipleRequest,
-	RetrieveRequest,
 	UpdateRequest,
 } from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';

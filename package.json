@@ -115,6 +115,16 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Specifies if the extension should use folders for web files instead of putting it all in one folder (default)"
+				},
+				"powerappsPortals.runPeriodicFetches": {
+					"type": "boolean",
+					"default": true,
+					"description": "If set to true the extension will periodically fetch data from Dynamics to keep everything up to date. (default true)"
+				},
+				"powerappsPortals.hideCommitWarning": {
+					"type": "boolean",
+					"default": false,
+					"description": "If true it will no longer show the warning when committing data to the portal."
 				}
 			}
 		},

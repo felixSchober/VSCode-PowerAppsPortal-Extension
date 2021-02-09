@@ -18,7 +18,7 @@ import { ALL_FILES_GLOB, createFolder } from './afs';
 import { WebTemplate } from '../models/WebTemplate';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { getMimeType, WebFile } from '../models/WebFile';
-import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
+import { ID365PortalLanguage } from '../models/interfaces/d365Language';
 import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 import { ID365WebTemplate } from '../models/interfaces/d365WebTemplate';
 import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
@@ -164,10 +164,10 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName + '.html');
 	}
 
-	public async download(): Promise<PortalData> {
+	public async download(silent: boolean): Promise<PortalData> {
 		const progressOptions: ProgressOptions = {
-			location: ProgressLocation.Notification,
-			title: 'Downloading data from Dynamics',
+			location: silent ? ProgressLocation.SourceControl : ProgressLocation.Notification,
+			title: 'Downloading',
 			cancellable: true,
 		};
 		this.isDownloadCanceled = false;
@@ -265,7 +265,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				progressMessage += `✓ Templates: ${webTemplates.length}`;
 				progress.report({
 					increment: 20,
-					message: progressMessage + `… Content Snippets `,
+					message: progressMessage + `… Snippets `,
 				});
 
 				for (const template of webTemplates) {
@@ -277,7 +277,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `✓ Content Snippets: ${webTemplates.length}`;
+				progressMessage += `✓ Snippets: ${webTemplates.length}`;
 				progress.report({
 					increment: 25,
 					message: progressMessage + `… Files `,
@@ -334,7 +334,9 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					message: progressMessage,
 				});
 
-				window.showInformationMessage(progressMessage);
+				if (!silent) {
+					window.showInformationMessage(progressMessage);
+				}				
 
 				this.portalData = result;
 				return result;
