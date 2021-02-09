@@ -17,7 +17,12 @@ export class ConfigurationManager {
 	portalId: string | undefined;
 	portalName: string | undefined;
 	defaultPageTemplate: string | undefined;
+
+	// experience settings
 	useFoldersForWebFiles: boolean | undefined;
+	runPeriodicFetches: boolean | undefined;
+	hideCommitWarning: boolean | undefined;
+
 
 	constructor(private readonly workspaceFolder: WorkspaceFolder) {
 	}
@@ -101,6 +106,9 @@ export class ConfigurationManager {
 			this.d365InstanceName = configuration.get<string>('dynamicsInstanceName');
 			this.d365CrmRegion = configuration.get<string>('dynamicsCrmRegion');
 			this.useFoldersForWebFiles = configuration.get<boolean>('useFoldersForFiles') || false;
+
+			this.runPeriodicFetches = configuration.get<boolean>('runPeriodicFetches') || true;
+			this.hideCommitWarning = configuration.get<boolean>('hideCommitWarning') || false;
 
 			aadClientId = configuration.get<string>('aadClientId');
 			aadTenantId = configuration.get<string>('aadTenantId');
@@ -217,12 +225,31 @@ export class ConfigurationManager {
 	}
 }
 
-export async function getConsent(question: string): Promise<boolean> {
+export async function getConsent(question: string, storeConsentSettingName: string | undefined = undefined): Promise<boolean> {
 	const options = ['Yes', 'No'];
+
+	// if remember option is set -> offer remember
+	const consentDontAskAgain = 'Yes, don\'t ask again';
+	if (storeConsentSettingName) {
+
+		// skip if consent has been given
+		const consentSetting = await workspace.getConfiguration().get<boolean>(PORTAL_SETTING_PREFIX_ID + '.' + storeConsentSettingName);
+		if (consentSetting) {
+			console.log('[START] Consent ' + storeConsentSettingName + ' has already been given.');
+			return true;
+		}
+
+		options.push(consentDontAskAgain);
+	}
+
 	const answer = await window.showQuickPick(options, { placeHolder: question });
 
-	if (answer && answer === options[0]) {
+	if (answer && answer !== options[1]) {
 		console.log('[START] User consent for ' + question);
+
+		if (answer === consentDontAskAgain) {
+			await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.' + storeConsentSettingName, true);
+		}
 		return true;
 	}
 	return false;

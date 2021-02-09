@@ -134,7 +134,8 @@ async function commandDiscard(sourceControlPane: vscode.SourceControl) {
 
 async function commandCommit(sourceControlPane: vscode.SourceControl) {
 	const consent = await getConsent(
-		'Do you want to commit your data to the portal? There will be no merge. Files will be overwritten with local state.'
+		'Commit local data to portal? There will be no merge. Files will be overwritten with local state.',
+		'hideCommitWarning'
 	);
 	if (!consent) {
 		return;
