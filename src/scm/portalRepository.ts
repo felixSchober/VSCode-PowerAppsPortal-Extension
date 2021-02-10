@@ -12,17 +12,20 @@ import {
 } from 'vscode';
 import * as path from 'path';
 import { ConfigurationManager } from '../configuration/configurationManager';
-import { getFilename, PortalData, PortalFileType } from '../models/portalData';
+import { getFileIdFromUri, PortalData, PortalFileType } from '../models/portalData';
 import { DynamicsApi } from '../api/dynamicsApi';
 import { ALL_FILES_GLOB, createFolder } from './afs';
 import { WebTemplate } from '../models/WebTemplate';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { getMimeType, WebFile } from '../models/WebFile';
-import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
+import { ID365PortalLanguage } from '../models/interfaces/d365Language';
 import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 import { ID365WebTemplate } from '../models/interfaces/d365WebTemplate';
 import { ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365Note } from '../models/interfaces/d365Note';
+import { WebPage } from '../models/webPage';
+import { ID365Webpage } from '../models/interfaces/d365Webpage';
+import { ID365PageTemplate } from '../models/interfaces/d365PageTemplate';
 
 export const POWERAPPSPORTAL_SCHEME = 'powerappsPortal';
 export const FOLDER_CONTENT_SNIPPETS = 'Content Snippets';
@@ -35,6 +38,9 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	private d365WebApi: DynamicsApi;
 	public portalName: string | undefined;
 	public portalId: string | undefined;
+	public defaultPageTemplate: string | undefined;
+	public lastRefresh: Date | undefined;
+
 	private portalData: PortalData | undefined;
 	public languages: Map<string, ID365PortalLanguage>;
 	private isDownloadCanceled: boolean;
@@ -127,6 +133,26 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 			case PortalFileType.webFile:
 				fileTypePath = FOLDER_WEB_FILES;
+
+				// should we create folders?
+				if (this.configurationManager.useFoldersForWebFiles) {
+					// get actual file
+					const webFile = <WebFile>portalDataFile;
+
+					if (webFile) {
+						const webFilePath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, webFile.filePath);
+
+						try {
+							await createFolder(webFilePath);
+						} catch (error) {
+							console.error(`Could not create folder ${webFilePath}`);
+							throw Error(`Could not create folder ${webFilePath}`);
+						}
+
+						return path.join(webFilePath, fileName);
+					}
+				}				
+
 				return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName);
 
 			case PortalFileType.webTemplate:
@@ -139,79 +165,70 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName + '.html');
 	}
 
-	public async download(): Promise<PortalData> {
+	public async download(silent: boolean, incrementalRefresh: boolean): Promise<PortalData> {
 		const progressOptions: ProgressOptions = {
-			location: ProgressLocation.Notification,
-			title: 'Downloading data from Dynamics',
+			location: silent ? ProgressLocation.SourceControl : ProgressLocation.Notification,
+			title: 'Downloading',
 			cancellable: true,
 		};
 		this.isDownloadCanceled = false;
+
+		let lastRefreshedDate: string | undefined;
+		if (!incrementalRefresh || !this.lastRefresh) {
+			lastRefreshedDate = undefined;
+		} else {
+			lastRefreshedDate = this.lastRefresh.toISOString();
+			console.log(`[REPO] Restrict to last modified: ${lastRefreshedDate}`);
+		}
 		try {
 			return window.withProgress(progressOptions, async (progress, token) => {
-				token.onCancellationRequested(() => {
-					this.isDownloadCanceled = true;
-					console.log('User canceled the long running operation');
-					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-				});
+				
+				token.onCancellationRequested(() => this.cancelDownload);
 
 				let progressMessage = `Download: `;
 				progress.report({
 					message: progressMessage,
 				});
 
-				let portalId: string | undefined;
-				if (!this.configurationManager.isPortalDataConfigured) {
-					portalId = await this.choosePortal();
+				let portalId: string;
+				try {
+					portalId = await this.downloadPortalId();
+				} catch (error) {
+					return this.cancelDownload();
+				}
+				
+				progress.report({increment: 5});
+
+				// create new portal data if not incremental refresh (e.g. at beginning)
+				let result: PortalData;
+				if (!this.portalData || !incrementalRefresh) {
+					result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+					lastRefreshedDate = undefined;
 				} else {
-					portalId = this.configurationManager.portalId;
-					this.portalName = this.configurationManager.portalName;
-					this.portalId = portalId;
-				}
-
-				if (!portalId) {
-					console.error('[REPO] Could not get portal id either from existing configuration or from user.');
-					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-				}
-
-				progress.report({
-					increment: 5,
-				});
-
-				const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+					console.log('[REPO] Incremental refresh -> reuse existing portal data.');
+					result = this.portalData;
+				}				 
 
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-
-				if (this.languages.size === 0) {
-					console.log('[REPO] Getting languages');
-
-					let languages: Map<string, ID365PortalLanguage> = new Map<string, ID365PortalLanguage>();
-					try {
-						languages = await this.d365WebApi.getLanguages(portalId);
-					} catch (error) {
-						window.showErrorMessage(`Could not get portal data: ${error}`);
-						return result;
-					}
-
-					if (languages.size === 0) {
-						window.showWarningMessage(
-							'Could not get any languages from portal. en-us will be set as the default.'
-						);
-					}
-
-					this.languages = languages;
-
-					console.log(`[REPO] Received ${this.languages.size} languages (not all of them active)`);
+				// *************
+				// LANGUAGES
+				// *************
+				try {
+					await this.downloadLanguages(portalId, result);
+				} catch (error) {
+					return result;
 				}
+				progress.report({increment: 10});
 
+				
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progress.report({
-					increment: 10,
-				});
-
+				// *************
+				// PUBLISHED STATE ID
+				// *************
 				let publishedStateId: string;
 				if (this.portalData && this.portalData.publishedStateId) {
 					publishedStateId = this.portalData.publishedStateId;
@@ -224,71 +241,69 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `${this.portalName}:`;
+
+				// *************
+				// TEMPLATES
+				// *************
 				progress.report({
 					increment: 10,
 					message: progressMessage + `… Templates `,
 				});
 
-				result.languages = this.languages;
-				const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
-
+				const numberOfTemplates = await this.downloadWebTemplates(portalId, lastRefreshedDate, result);
+				progressMessage += `✓ Templates: ${numberOfTemplates}`;
+				
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `✓ Templates: ${webTemplates.length}`;
+
+				// *************
+				// SNIPPETS
+				// *************
 				progress.report({
-					increment: 25,
-					message: progressMessage + `… Content Snippets `,
+					increment: 20,
+					message: progressMessage + `… Snippets `,
 				});
-
-				for (const template of webTemplates) {
-					result.data.webTemplate.set(template.name.toLowerCase(), template);
-				}
-
-				const contentSnippets = await this.d365WebApi.getContentSnippets(portalId, this.languages);
+				const numberOfSnippets = await this.downloadContentSnippets(portalId, lastRefreshedDate, result);
+				progressMessage += `✓ Snippets: ${numberOfSnippets}`;
 
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `✓ Content Snippets: ${webTemplates.length}`;
 				progress.report({
 					increment: 25,
 					message: progressMessage + `… Files `,
 				});
 
-				for (const snippet of contentSnippets) {
-					const namePath = snippet.name.split('/');
-
-					// insert language into name path e.g. 'Account/SignIn/PageCopy'
-					// -> 'Account/SignIn/en-us/PageCopy'
-					const name = [
-						...namePath.slice(0, namePath.length - 1),
-						snippet.language,
-						namePath[namePath.length - 1],
-					];
-					result.data.contentSnippet.set(name.join('/').toLowerCase(), snippet);
-				}
+				// *************
+				// WEB PAGES
+				// *************			
+				await this.downloadWebPages(portalId, result);
+				await this.downloadChooseDefaultWebPageRoot(portalId);
 
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				const webFiles = await this.d365WebApi.getWebFiles(portalId);
-				for (const file of webFiles) {
-					if (!file || !file.d365Note) {
-						console.error(`Could not get a file.`);
-					}
-					result.data.webFile.set(file.d365Note.filename.toLowerCase(), file);
-				}
+				// *************
+				// WEB FILES
+				// *************
+				progress.report({
+					increment: 5,
+					message: progressMessage + `… Files `,
+				});
+				const numberOfWebFiles = await this.downloadWebFiles(portalId, lastRefreshedDate, result);
+				progressMessage += `✓ Files: ${numberOfWebFiles} `;
 
-				progressMessage += `✓ Files: ${webTemplates.length} `;
 				progress.report({
 					increment: 25,
 					message: progressMessage,
 				});
 
-				window.showInformationMessage(progressMessage);
+				if (!silent) {
+					window.showInformationMessage(progressMessage);
+				}			
 
+				this.lastRefresh = new Date();
 				this.portalData = result;
 				return result;
 			});
@@ -297,6 +312,117 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			throw new Error(error);
 		}
 	}
+
+	private cancelDownload() : PortalData {
+		this.isDownloadCanceled = true;
+		console.log('User canceled the long running operation');
+		if (this.portalData) {
+			return this.portalData;
+		} else {
+			return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+		}	
+	}
+
+	private async downloadPortalId(): Promise<string> {
+		let portalId: string | undefined;
+		if (!this.configurationManager.isPortalDataConfigured) {
+			portalId = await this.choosePortal();
+		} else {
+			portalId = this.configurationManager.portalId;
+			this.portalName = this.configurationManager.portalName;
+			this.portalId = portalId;
+			this.defaultPageTemplate = this.configurationManager.defaultPageTemplate;
+		}
+
+		if (!portalId) {
+			throw Error('[REPO] Could not get portal id either from existing configuration or from user.');
+		}
+
+		return portalId;
+	}
+
+	private async downloadLanguages(portalId: string, result: PortalData) {
+		if (this.languages.size === 0) {
+			console.log('[REPO] Getting languages');
+
+			let languages: Map<string, ID365PortalLanguage> = new Map<string, ID365PortalLanguage>();
+			try {
+				languages = await this.d365WebApi.getLanguages(portalId);
+			} catch (error) {
+				window.showErrorMessage(`Could not get portal data: ${error}`);
+				throw error;
+			}
+
+			if (languages.size === 0) {
+				window.showWarningMessage(
+					'Could not get any languages from portal. en-us will be set as the default.'
+				);
+			}
+
+			this.languages = languages;
+			result.languages = this.languages;
+
+			console.log(`[REPO] Received ${this.languages.size} languages (not all of them active)`);
+		}
+	}
+
+	private async downloadWebTemplates(portalId: string, lastRefreshedDate: string | undefined, result: PortalData) : Promise<number> {
+		const webTemplates = await this.d365WebApi.getWebTemplates(portalId, true, lastRefreshedDate);
+		for (const template of webTemplates) {
+			result.data.webTemplate.set(template.name.toLowerCase(), template);
+		}
+		return webTemplates.length;
+	}
+
+	private async downloadContentSnippets(portalId: string, lastRefreshedDate: string | undefined, result: PortalData) : Promise<number> {
+		const contentSnippets = await this.d365WebApi.getContentSnippets(portalId, this.languages, true, lastRefreshedDate);
+
+		for (const snippet of contentSnippets) {
+			const namePath = snippet.name.split('/');
+
+			// insert language into name path e.g. 'Account/SignIn/PageCopy'
+			// -> 'Account/SignIn/en-us/PageCopy'
+			const name = [
+				...namePath.slice(0, namePath.length - 1),
+				snippet.language,
+				namePath[namePath.length - 1],
+			];
+			result.data.contentSnippet.set(name.join('/').toLowerCase(), snippet);
+		}
+		return contentSnippets.length;
+	}
+
+	private async downloadWebPages(portalId: string, result: PortalData) {
+		// get web pages				
+		console.log('[REPO] Getting web pages');
+		const webPageHierarchy = await this.d365WebApi.getWebPageHierarchy(portalId);
+		result.webPages = webPageHierarchy;
+	}
+
+	private async downloadChooseDefaultWebPageRoot(portalId: string) {
+		if (this.configurationManager.useFoldersForWebFiles && !this.configurationManager.defaultPageTemplate) {
+			console.log('[REPO] default page template not set. Asking user.');
+			
+			// get default page template id
+			this.defaultPageTemplate = await this.chooseDefaultWebTemplateId(portalId, undefined);
+			this.configurationManager.defaultPageTemplate = this.defaultPageTemplate;
+			await this.configurationManager.storePortalConfigurationFile();
+			console.log('[REPO] default page template id set: ' + this.defaultPageTemplate);
+		}
+	}
+
+	private async downloadWebFiles(portalId: string, lastRefreshedDate: string | undefined, result: PortalData) : Promise<number> {
+		const webFiles = await this.d365WebApi.getWebFiles(portalId, result.webPages, true, lastRefreshedDate);
+		for (const file of webFiles) {
+			if (!file || !file.d365Note) {
+				console.error(`Could not get a file.`);
+			}
+			result.data.webFile.set(file.fileId, file);
+		}
+		return webFiles.length;
+	}
+
+
 
 	public async deleteDocumentInRepository(fileType: PortalFileType, uri: Uri): Promise<void> {
 		switch (fileType) {
@@ -337,7 +463,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				} catch (error) {
 					console.error('Could not delete file ' + f.d365Note.filename + ' Error: ' + error);
 				}
-				this.portalData?.data.webFile.delete(f.d365Note.filename);
+				this.portalData?.data.webFile.delete(f.fileId);
 				break;
 
 			default:
@@ -385,7 +511,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				const resultF = await this.updateWebFile(existingFile, updatedFileContent);
 
 				if (resultF) {
-					this.portalData.data.webFile.set(resultF.d365Note.filename, resultF);
+					this.portalData.data.webFile.set(resultF.fileId, resultF);
 					console.log(`\t[REPO] File ${resultF.d365Note.filename} was updated.`);
 				} else {
 					throw new Error(`Could not find file for uri ${uri}`);
@@ -447,7 +573,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			throw Error('Could not update file because portal data in repo class was not set.');
 		}
 
-		const fileName = getFilename(uri, fileType);
+		const fileId = getFileIdFromUri(uri, fileType);
 
 		if (!this.portalId) {
 			throw Error('Portal Id is not specified.');
@@ -458,7 +584,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					_adx_websiteid_value: this.portalId,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
-					adx_name: fileName,
+					adx_name: fileId, // for web template: fileId = fileName
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					adx_source: newFileContent,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -474,7 +600,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				const languageCode = this.portalData.getLanguageFromPath(uri);
 				const localNewSnippet: ID365ContentSnippet = {
 					// eslint-disable-next-line @typescript-eslint/naming-convention
-					adx_name: fileName,
+					adx_name: fileId,  // for contentSnippet: fileId = fileName
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					adx_value: newFileContent,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -495,8 +621,13 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					console.warn('Could not upload file because published state id is not defined.');
 					this.portalData.publishedStateId = await this.d365WebApi.getPublishedPublishStateId(this.portalId);
 				}
-
-				const parentPageId = await this.chooseWebPage(fileName);
+				const fileNameParts = fileId.split(path.sep);
+				if (fileNameParts.length < 1) {
+					window.showErrorMessage(`The path of the file to be commited is not formatted correctly. Please try again or report the error. File Path: ${uri.fsPath}. File Id: ${fileId}`);
+					break;
+				}
+				const fileName = fileNameParts[fileNameParts.length - 1];
+				const parentPage = await this.getWebFileLocation(uri, fileName);
 				const localNewNote: ID365Note = {
 					documentbody: newFileContent,
 					filename: fileName,
@@ -509,10 +640,11 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				const remoteNewFile = await this.d365WebApi.uploadFile(
 					localNewNote,
 					this.portalId,
-					parentPageId,
-					this.portalData.publishedStateId
+					parentPage.id,
+					this.portalData.publishedStateId,
+					parentPage
 				);
-				this.portalData.data.webFile.set(remoteNewFile.d365Note.filename, remoteNewFile);
+				this.portalData.data.webFile.set(remoteNewFile.fileId, remoteNewFile);
 				console.log(`\t[REPO] File ${remoteNewFile.d365Note.filename} was updated.`);
 				break;
 
@@ -540,6 +672,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 		const portalChoice = await window.showQuickPick(new Array(...portals.keys()), {
 			placeHolder: 'Select Portal',
+			canPickMany: false,
 			ignoreFocusOut: true,
 		});
 
@@ -552,7 +685,143 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		return this.portalId;
 	}
 
-	private async chooseWebPage(fileName: string): Promise<string> {
+	private async chooseDefaultWebTemplateId(portalId: string, pageTemplates: Array<ID365PageTemplate> | undefined): Promise<string> {
+		if (!pageTemplates) {
+			try {
+				pageTemplates = await this.d365WebApi.getPageTemplates(portalId);
+			} catch (error) {
+				window.showErrorMessage(`Could not get page template data: ${JSON.stringify(error)}`);
+				return '';
+			}
+		}
+		
+		const pageTemplateChoices: QuickPickItem[] = pageTemplates.map((template) => {
+			return {
+				label: template.adx_name
+			};
+		});
+
+		const webTemplateChoice = await window.showQuickPick(pageTemplateChoices, {
+			canPickMany: false,
+			ignoreFocusOut: true,
+			placeHolder: 'Select a default page template which is used for new web file paths. Recommendation: \'Page\'. This setting only has an impact if folders for web files is enabled.',
+		 });
+
+		 const pickedTemplate = pageTemplates.find((t) => t.adx_name === webTemplateChoice?.label);
+		 if (pickedTemplate) {
+			 return pickedTemplate.adx_pagetemplateid;
+		 }
+		 window.showErrorMessage(`Could not get find id for page template. Please choose a different template.`);
+
+		 return await this.chooseDefaultWebTemplateId(portalId, pageTemplates);
+	}
+
+	private async getWebFileLocation(uri: Uri, filename: string): Promise<WebPage> {
+		// conventional approach (ask which web page to use as parent)
+		if (!this.configurationManager.useFoldersForWebFiles) {
+			return await this.chooseWebPage(filename);
+		}
+
+
+		// derive web page from uri
+		const parentWebPage = this.portalData?.getWebPage(uri);
+
+		if (parentWebPage) {
+			return parentWebPage;
+		}
+
+		// web page does not exist (yet)
+		console.log(`[REPO] Could not find preexisting web page for uri ${uri.fsPath}. Creating new web file(s).`);
+
+		return await this.createPartialWebPagePath(uri);
+	}
+
+	private async createPartialWebPagePath(uri: Uri): Promise<WebPage> {
+		const folders = path.dirname(uri.fsPath).split(path.sep);
+
+		const webPagesToCreate: Array<Partial<ID365Webpage>> = new Array<Partial<ID365Webpage>>();
+
+		// find first matching web page or root path
+
+		while(folders.length > 0) {
+			const currentWebPageName = folders[folders.length - 1];
+
+			// stop if root is reached
+			if (currentWebPageName === FOLDER_WEB_FILES) {
+				const rootPage = this.portalData?.getRootWebPage();
+
+				// could not find root page
+				if(!rootPage) {
+					break;
+				}
+
+				// set prev. last web page with root page
+				const lastWebPage = webPagesToCreate[webPagesToCreate.length - 1];
+				lastWebPage._adx_parentpageid_value = rootPage.id;
+				break;				
+			}
+
+			let potentialWebPage = this.portalData?.getWebPageFromPartialFilePath(folders);
+
+			// web page not found
+			if (!potentialWebPage) {
+				const toCreate: Partial<ID365Webpage> = {
+					// eslint-disable-next-line @typescript-eslint/naming-convention
+					adx_name: currentWebPageName, // eslint-disable-next-line @typescript-eslint/naming-convention
+					adx_partialurl: currentWebPageName, // eslint-disable-next-line @typescript-eslint/naming-convention		
+					_adx_pagetemplateid_value: this.configurationManager.defaultPageTemplate, // eslint-disable-next-line @typescript-eslint/naming-convention					
+					_adx_publishingstateid_value: this.portalData?.publishedStateId, // eslint-disable-next-line @typescript-eslint/naming-convention
+					_adx_parentpageid_value: undefined, // eslint-disable-next-line @typescript-eslint/naming-convention
+					_adx_websiteid_value: this.portalId,// eslint-disable-next-line @typescript-eslint/naming-convention
+					adx_hiddenfromsitemap: true
+				};
+				webPagesToCreate.push(toCreate);
+			} else {
+				const lastWebPage = webPagesToCreate[webPagesToCreate.length - 1];
+				if (lastWebPage) {
+					lastWebPage._adx_parentpageid_value = potentialWebPage.id;
+					break;
+				}				
+			}
+
+			folders.pop();
+		}
+
+		// constructed web page hierarchy finished
+		let prevParentId: string | undefined = webPagesToCreate[webPagesToCreate.length - 1]?._adx_parentpageid_value;
+		let lastWebPage: WebPage | undefined;
+		while(webPagesToCreate.length > 0) {
+			const webPageToCreate = webPagesToCreate.pop();
+
+			if (!webPageToCreate) {
+				break;
+			}
+
+			if (prevParentId) {
+				webPageToCreate._adx_parentpageid_value = prevParentId;
+			}
+
+			let newWebPage: ID365Webpage | undefined;
+			try {
+				newWebPage = await this.d365WebApi.createWebPage(webPageToCreate);
+			} catch (error) {
+				window.showErrorMessage(`Could not create partial web page path element ${webPageToCreate.adx_partialurl}. Error: ${JSON.stringify(error)}`);
+				throw error;
+			}
+
+			console.log('[REPO] Created web page: ' + newWebPage.adx_name);
+			prevParentId = newWebPage.adx_webpageid;
+			lastWebPage = WebPage.addWebPagesToPageHierarchy(this.portalData?.webPages || new Map<string, WebPage>(), newWebPage);;
+		}
+
+		if (!lastWebPage) {
+			throw Error('Could not create web pages to upload web files. Please try to create a file path hierarchy in Dynamics first.');
+		}
+
+		return lastWebPage;
+	}
+
+	private async chooseWebPage(fileName: string): Promise<WebPage> {
 		if (!this.portalData) {
 			throw Error('Could not choose web page because portal data in repo class was not set.');
 		}
@@ -561,21 +830,22 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			throw Error('Could not choose web page because portal Id is not specified.');
 		}
 
-		if (this.portalData.webPages.length === 0) {
+		if (this.portalData.webPages.size === 0) {
 			console.log('[REPO] Uploading file but no web pages to choose from. Downloading web pages.');
-			this.portalData.webPages = await this.d365WebApi.getWebPages(this.portalId);
+			this.portalData.webPages = await this.d365WebApi.getWebPageHierarchy(this.portalId);
 
 			// no result
-			if (this.portalData.webPages.length === 0) {
+			if (this.portalData.webPages.size === 0) {
 				throw Error(
 					'[REPO] Could not get web pages from portal. Result set is empty. Please make sure the portal has web pages.'
 				);
 			}
 		}
-		const webPageNames: Array<QuickPickItem> = this.portalData.webPages.map((webPage) => {
+		const webPagesFlatList = new Array<WebPage>(...this.portalData.webPages.values());
+		const webPageNames: Array<QuickPickItem> = webPagesFlatList.map((webPage) => {
 			const item: QuickPickItem = {
-				label: webPage.adx_name,
-				description: `.../${webPage.adx_partialurl}/${fileName}`,
+				label: webPage.name,
+				description: `${webPage.getFullPath()}/${fileName}`,
 			};
 			return item;
 		});
@@ -589,8 +859,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 
 		// resolve id
-		const result = this.portalData.webPages.find((webpage) => webpage.adx_name === webPageChoice.label)
-			?.adx_webpageid;
+		const result = webPagesFlatList.find((webpage) => webpage.name === webPageChoice.label);
 
 		if (!result) {
 			return await this.chooseWebPage(fileName);

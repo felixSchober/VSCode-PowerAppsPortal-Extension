@@ -100,7 +100,7 @@ function register(
 async function commandRefresh(sourceControlPane: vscode.SourceControl) {
 	const sourceControl = await pickSourceControl(sourceControlPane);
 	if (sourceControl) {
-		sourceControl.refresh();
+		sourceControl.refresh(false);
 	} else {
 		vscode.window.showErrorMessage(
 			'Could not get source control window. Please check if the extension is configured correctly.'
@@ -134,7 +134,8 @@ async function commandDiscard(sourceControlPane: vscode.SourceControl) {
 
 async function commandCommit(sourceControlPane: vscode.SourceControl) {
 	const consent = await getConsent(
-		'Do you want to commit your data to the portal? There will be no merge. Files will be overwritten with local state.'
+		'Commit local data to portal? There will be no merge. Files will be overwritten with local state.',
+		'hideCommitWarning'
 	);
 	if (!consent) {
 		return;
@@ -143,6 +144,8 @@ async function commandCommit(sourceControlPane: vscode.SourceControl) {
 	const sourceControl = await pickSourceControl(sourceControlPane);
 	if (sourceControl) {
 		sourceControl.commitAll();
+	} else {
+		vscode.window.showErrorMessage('Something really strange has happened - The source control pane went missing. Can you try to restart VsCode?');
 	}
 }
 
@@ -219,6 +222,7 @@ async function initializeFolderFromConfiguration(
 		return;
 	}
 	registerPowerAppsPortalSourceControl(portalScm, context);
+	portalScm.initializePeriodicFetch();
 }
 
 function registerPowerAppsPortalSourceControl(
@@ -226,10 +230,10 @@ function registerPowerAppsPortalSourceControl(
 	context: vscode.ExtensionContext
 ) {
 	// update the portal document content provider with the latest content
-	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData());
+	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData(), powerappsSourceControl.useFoldersForWebFiles);
 
 	// every time the repository is updated with new portalData version, notify the content provider
-	powerappsSourceControl.onRepositoryChange((portalData) => portalDocumentContentProvider.updated(portalData));
+	powerappsSourceControl.onRepositoryChange((portalData) => portalDocumentContentProvider.updated(portalData, powerappsSourceControl.useFoldersForWebFiles));
 
 	if (portalSourceControlRegister.has(powerappsSourceControl.getWorkspaceFolder().uri)) {
 		// the folder was already under source control
@@ -288,7 +292,7 @@ async function configureExtension(
 
 	registerPowerAppsPortalSourceControl(portalScm, context);
 
-	// show the file explorer with the three new files
+	// show the file explorer
 	vscode.commands.executeCommand('workbench.view.explorer');
 }
 
@@ -320,7 +324,4 @@ async function chooseWorkspaceFolder() {
 		vscode.window.showErrorMessage('Please pick a folder');
 		return;
 	}
-
-	const test = await vscode.commands.executeCommand('vscode.openFolder', folders[0], useSameWindow);
-	console.log(test);
 }
