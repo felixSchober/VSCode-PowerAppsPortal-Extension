@@ -6,7 +6,7 @@ import { WebTemplate } from './WebTemplate';
 import path = require('path');
 import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from '../scm/portalRepository';
 import { ID365PortalLanguage } from './interfaces/d365Language';
-import { ID365Webpage } from './interfaces/d365Webpage';
+import { WebPage } from './webPage';
 
 export class PortalData {
 	public instanceName: string;
@@ -14,12 +14,12 @@ export class PortalData {
 	public data: IPortalDocuments;
 	public languages = new Map<string, ID365PortalLanguage>();
 	public publishedStateId: string | undefined;
-	public webPages: Array<ID365Webpage>;
+	public webPages: Map<string, WebPage>;
 
 	constructor(instanceName: string, portalName: string) {
 		this.instanceName = instanceName;
 		this.portalName = portalName;
-		this.webPages = new Array<ID365Webpage>();
+		this.webPages = new Map<string, WebPage>();
 
 		this.data = {
 			contentSnippet: new Map<string, ContentSnippet>(),
@@ -28,18 +28,21 @@ export class PortalData {
 		};
 	}
 
+	public get numberOfDocuments(): number {
+		return this.data.contentSnippet.size + this.data.webFile.size + this.data.webTemplate.size;
+	}
+
 	public fileExists(uri: Uri): boolean {
 		const fileType = getFileType(uri);
-		let fileName = getFilename(uri, fileType);
+		let fileId = getFileIdFromUri(uri, fileType);
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				// fileName = fileName.replace(/_/g, '/');
-				return this.data.contentSnippet.has(fileName);
+				return this.data.contentSnippet.has(fileId);
 			case PortalFileType.webTemplate:
-				return this.data.webTemplate.has(fileName);
+				return this.data.webTemplate.has(fileId);
 			case PortalFileType.webFile:
-				return this.data.webFile.has(fileName);
+				return this.data.webFile.has(fileId);
 			default:
 				return false;
 		}
@@ -66,18 +69,56 @@ export class PortalData {
 	}
 
 	public getContentSnippet(uri: Uri): ContentSnippet | undefined {
-		let fileName = getFilename(uri, PortalFileType.contentSnippet);
+		let fileName = getFileIdFromUri(uri, PortalFileType.contentSnippet);
 		return this.data.contentSnippet.get(fileName);
 	}
 
 	public getWebTemplate(uri: Uri): WebTemplate | undefined {
-		let fileName = getFilename(uri, PortalFileType.webTemplate);
+		let fileName = getFileIdFromUri(uri, PortalFileType.webTemplate);
 		return this.data.webTemplate.get(fileName);
 	}
 
 	public getWebFile(uri: Uri): WebFile | undefined {
-		let fileName = getFilename(uri, PortalFileType.webFile);
+		let fileName = getFileIdFromUri(uri, PortalFileType.webFile);
 		return this.data.webFile.get(fileName);
+	}
+
+	public getRootWebPage(): WebPage | undefined {
+		if (this.webPages.size === 0) {
+			return undefined;
+		}
+
+		for (const page of this.webPages.values()) {
+			if (!page.parentId) {
+				return page;
+			}
+		}
+
+		return undefined;
+	}
+
+	public getWebPage(uri: Uri): WebPage | undefined {
+		const folders = path.dirname(uri.fsPath).split(path.sep);
+		return this.getWebPageFromPartialFilePath(folders);
+	}
+
+	public getWebPageFromPartialFilePath(folders: string[]): WebPage | undefined {
+		const folderName = folders[folders.length - 1];
+
+		if (folderName === FOLDER_WEB_FILES) {
+			return this.getRootWebPage();
+		}
+
+		// try to find this web page based on folder name
+		let parentWebPage: WebPage | undefined;
+		for (const webPage of this.webPages.values()) {
+			if (webPage.url === folderName) {
+				parentWebPage = webPage;
+				break;
+			}
+		}
+
+		return parentWebPage;
 	}
 
 	public getLanguageFromPath(uri: Uri): string {
@@ -105,9 +146,13 @@ export class PortalData {
  * Get the name of the file
  * @param uri document uri
  */
-export function getFilename(uri: Uri, fileType?: PortalFileType): string {
+export function getFileIdFromUri(uri: Uri, fileType?: PortalFileType): string {
 	if (fileType && fileType === PortalFileType.webFile) {
-		return path.basename(uri.fsPath).toLowerCase();
+		const folders = uri.fsPath.split(path.sep);
+		const webFileIndex = folders.indexOf(FOLDER_WEB_FILES);
+		const fileName = folders.slice(webFileIndex + 1);
+		const fn = '/' + fileName.join('/');
+		return fn.toLowerCase();
 	}
 
 	if (fileType === PortalFileType.contentSnippet) {
@@ -120,6 +165,14 @@ export function getFilename(uri: Uri, fileType?: PortalFileType): string {
 		return fn.toLowerCase();
 	}
 	return path.basename(uri.fsPath).split('.')[0].toLowerCase();
+}
+
+export function getFileName(uri: Uri, fileType?: PortalFileType): string {
+	if (fileType && fileType === PortalFileType.webFile) {
+		return path.basename(uri.fsPath).toLowerCase();
+	}
+
+	return getFileIdFromUri(uri, fileType);
 }
 
 export function getFileType(uri: Uri): PortalFileType {

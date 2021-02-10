@@ -21,6 +21,7 @@ export interface ConfigurationState {
 	aadClientId: string;
 	aadClientSecret: string;
 	aadTenantId: string;
+	useFoldersForFiles: boolean;
 }
 
 export async function multiStepInput(context: ExtensionContext): Promise<ConfigurationState>  {
@@ -38,6 +39,17 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		{label: 'crm11', description: 'UK'}
 	];
 
+	const yesNo: QuickPickItem[] = [
+		{label: 'yes', description: 'new'},
+		{label: 'no'}
+	];
+
+	function interpretYesNoQuestion(picked: QuickPickItem): boolean {
+		return picked.label === 'yes';
+	}
+
+	const CANCEL_MESSAGE: string = ' Type cancel to \'cancel\' configuration.';
+
 	async function collectInputs() {
 		const state = {} as Partial<ConfigurationState>;
 		await MultiStepInput.run((input) => inputInstanceName(input, state));
@@ -51,12 +63,16 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.instanceName = await input.showInputBox({
 			title,
 			step: 1,
-			totalSteps: 5,
+			totalSteps: 6,
 			value: state.instanceName || '',
-			prompt: 'Provide the name of your instance. E.g. org7acas9gc if the url to your org is org7c98f08c.crm4.dynamics.com',
+			prompt: 'Provide the name of your instance. E.g. org7acas9gc if the url to your org is org7c98f08c.crm4.dynamics.com.' + CANCEL_MESSAGE,
 			validate: noValidation,
 			shouldResume: shouldResume,
 		});
+
+		if(!state.instanceName || state.instanceName === 'cancel') {
+			throw Error('canceled');
+		}
 		return (input: MultiStepInput) => pickEmeaRegion(input, state);
 	}
 
@@ -64,7 +80,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		const pick = await input.showQuickPick({
 			title,
 			step: 2,
-			totalSteps: 5,
+			totalSteps: 6,
 			placeholder: 'Select your portal region',
 			items: crmRegions,
 			activeItem: typeof state.crmRegion !== 'string' ? state.crmRegion : undefined,
@@ -79,12 +95,17 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.aadTenantId = await input.showInputBox({
 			title,
 			step: 3,
-			totalSteps: 5,
+			totalSteps: 6,
 			value: state.aadTenantId || '',
-			prompt: 'Provide the tenant Id of your AAD instance e.g. 10ea4d3e-1511-4461-9c6d-e21e73840528',
+			prompt: 'Provide the tenant Id of your AAD instance e.g. 10ea4d3e-1511-4461-9c6d-e21e73840528.' + CANCEL_MESSAGE,
 			validate: validateGuid,
 			shouldResume: shouldResume,
 		});
+
+		if(!state.aadTenantId || state.aadTenantId === 'cancel') {
+			throw Error('canceled');
+		}
+
 		return (input: MultiStepInput) => inputClientId(input, state);
 	}
 
@@ -93,12 +114,15 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.aadClientId = await input.showInputBox({
 			title,
 			step: 4,
-			totalSteps: 5,
+			totalSteps: 6,
 			value: state.aadClientId || '',
-			prompt: 'Provide the client Id of your AAD app registration e.g. 65f4ee4c-bbec-4059-b2ce-05e8e8acc679',
+			prompt: 'Provide the client Id of your AAD app registration e.g. 65f4ee4c-bbec-4059-b2ce-05e8e8acc679' + CANCEL_MESSAGE,
 			validate: validateGuid,
 			shouldResume: shouldResume,
 		});
+		if(!state.aadClientId || state.aadTenantId === 'cancel') {
+			throw Error('canceled');
+		}
 		return (input: MultiStepInput) => inputClientSecret(input, state);
 	}
 
@@ -106,12 +130,32 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.aadClientSecret = await input.showInputBox({
 			title,
 			step: 5,
-			totalSteps: 5,
+			totalSteps: 6,
 			value: state.aadClientSecret || '',
-			prompt: 'Provide the client secret',
+			prompt: 'Provide the client secret' + CANCEL_MESSAGE,
 			validate: noValidation,
 			shouldResume: shouldResume,
 		});		
+
+		if(!state.aadClientSecret || state.aadTenantId === 'cancel') {
+			throw Error('canceled');
+		}
+
+		return (input: MultiStepInput) => inputUseFoldersForFiles(input, state);
+	}
+
+	async function inputUseFoldersForFiles(input:MultiStepInput, state: Partial<ConfigurationState>) {
+		const pick = await input.showQuickPick({
+			title,
+			step: 6,
+			totalSteps: 6,
+			items: yesNo,
+			placeholder: 'Do you want to organize web files in folders?',
+			validate: noValidation,
+			shouldResume: shouldResume,
+		});	
+		
+		state.useFoldersForFiles = interpretYesNoQuestion(pick);
 	}
 
 

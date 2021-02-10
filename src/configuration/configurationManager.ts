@@ -1,12 +1,13 @@
 import { ExtensionContext, window, workspace, WorkspaceFolder } from 'vscode';
 import { IPortalConfigurationFile } from '../models/interfaces/portalConfigurationFile';
 import { CredentialManager } from './credentialManager';
-import { multiStepInput } from './quickInputConfigurator';
+import { ConfigurationState, multiStepInput } from './quickInputConfigurator';
 import * as afs from '../scm/afs';
 import path = require('path');
 
 
 export const PORTAL_CONFIGURATION_FILE = ".portal";
+export const PORTAL_SETTING_PREFIX_ID = "powerappsPortals";
 
 export class ConfigurationManager {
 
@@ -15,8 +16,17 @@ export class ConfigurationManager {
 	credentialManager: CredentialManager | undefined;
 	portalId: string | undefined;
 	portalName: string | undefined;
+	defaultPageTemplate: string | undefined;
+
+	// experience settings
+	useFoldersForWebFiles: boolean;
+	runPeriodicFetches: boolean = false;
+	hideCommitWarning: boolean | undefined;
+
+	askLegacyWebFilesMigration: boolean | undefined;
 
 	constructor(private readonly workspaceFolder: WorkspaceFolder) {
+		this.useFoldersForWebFiles = true;
 	}
 
 	get isConfigured(): boolean {
@@ -94,12 +104,32 @@ export class ConfigurationManager {
 		let aadClientId: string | undefined;
 		let aadTenantId: string | undefined; 
 		try {
-			const configuration = workspace.getConfiguration('powerappsPortals');
+			const configuration = workspace.getConfiguration(PORTAL_SETTING_PREFIX_ID);
 			this.d365InstanceName = configuration.get<string>('dynamicsInstanceName');
 			this.d365CrmRegion = configuration.get<string>('dynamicsCrmRegion');
+			const useFolders: boolean | undefined = configuration.get('useFoldersForFiles');
+			if (useFolders === undefined) {
+				this.useFoldersForWebFiles = true;
+			} else{
+				this.useFoldersForWebFiles = useFolders;
+			}
+			this.runPeriodicFetches = configuration.get('runPeriodicFetches') || false;
+			this.hideCommitWarning = configuration.get('hideCommitWarning');
+
+
 
 			aadClientId = configuration.get<string>('aadClientId');
 			aadTenantId = configuration.get<string>('aadTenantId');
+
+			// legacy migration to folders instead of files.
+			// never ask if already enabled
+			if (this.useFoldersForWebFiles) {
+				this.askLegacyWebFilesMigration = false;
+				await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
+			}
+
+			this.askLegacyWebFilesMigration = configuration.get('askLegacyWebFilesMigration');
+			
 
 			if (!aadClientId || !aadTenantId) {
 				throw Error('[CONFIG] Could not load either client id or tenant id from local config store.');
@@ -116,6 +146,36 @@ export class ConfigurationManager {
 		await this.loadPortalConfigurationFile();
 	}
 
+	public async askForPortalDataFileMigration() : Promise<boolean> {
+		if (!this.askLegacyWebFilesMigration) {
+			return false;
+		}
+
+		const options = ['Yes, migrate now', 'Please ask me next time', 'No, don\'t ask again'];
+		const pickedOption = await window.showInformationMessage('Do you want to migrate your local folder structure for web files? This does not change the structure in Dynamics.', {modal: false}, ...options);
+
+		if (pickedOption === options[0]) {
+			this.migrateToFolderFileStructure();
+			return true;
+		}
+
+		if (pickedOption === options[2]) {
+			await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
+			this.askLegacyWebFilesMigration = false;
+		}
+
+		window.showInformationMessage('You can always migrate yourself by changing the \'powerappsPortals.useFoldersForFiles\' setting.');
+		return false;
+	}
+
+	private async migrateToFolderFileStructure() {		
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.useFoldersForFiles', true);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
+
+		this.useFoldersForWebFiles = true;
+		this.askLegacyWebFilesMigration = false;
+	}
+
 	private async loadPortalConfigurationFile() {
 		// Loads the portal configuration file that contains the id and name
 		const configFilePath = this.getConfigurationFilePath();
@@ -124,22 +184,41 @@ export class ConfigurationManager {
 		if (configFileExists) {
 			const data = await afs.readFile(configFilePath);
 			const config: IPortalConfigurationFile = <IPortalConfigurationFile>JSON.parse(data.toString(afs.UTF8));
-			if (!config || !config.portalId || !config.portalName) {
+			if (!config || !config.portalId || !config.portalName || (this.useFoldersForWebFiles && !config.defaultPageTemplateId)) {
 				console.warn(`[CONFIG] Portal config file exists but content is not valid: ${data.toString(afs.UTF8)}`);
 				return;
 			}
 
 			this.portalId = config.portalId;
 			this.portalName = config.portalName;
+			this.defaultPageTemplate = config.defaultPageTemplateId;
 
 			console.log(`[CONFIG] Restored portal name and id with config file.`);
 		}
 	}
 
 	private async configure(context: ExtensionContext) {
-		const config = await multiStepInput(context);
+
+		let config: ConfigurationState | undefined = undefined;
+		try {
+			config = await multiStepInput(context);
+		} catch (error) {
+			window.showInformationMessage('Power Apps Portal configuration canceled.');
+			if (error.message === 'canceled') {
+				return;
+			}
+			console.error('Could not get user configuration: ' + error);
+		}
+
+		if (!config) {
+			window.showErrorMessage('Could not get configuration for Portal connection. Please try again.');
+			return;
+		}
+		
 
 		this.d365InstanceName = config.instanceName;
+		this.useFoldersForWebFiles = config.useFoldersForFiles;
+		this.askLegacyWebFilesMigration = false;
 		
 		if (typeof config.crmRegion === 'string') {
 			this.d365CrmRegion = config.crmRegion;
@@ -162,22 +241,27 @@ export class ConfigurationManager {
 			throw Error('Could not store configuration because connection values are not specified');
 		}
 
-		await workspace.getConfiguration().update('powerappsPortals.aadTenantId', this.credentialManager.aadTenantId);
-		await workspace.getConfiguration().update('powerappsPortals.aadClientId', this.credentialManager.aadClientId);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.aadTenantId', this.credentialManager.aadTenantId);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.aadClientId', this.credentialManager.aadClientId);
 
-		await workspace.getConfiguration().update('powerappsPortals.dynamicsInstanceName', this.d365InstanceName);
-		await workspace.getConfiguration().update('powerappsPortals.dynamicsCrmRegion', this.d365CrmRegion);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.dynamicsInstanceName', this.d365InstanceName);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.dynamicsCrmRegion', this.d365CrmRegion);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.useFoldersForFiles', this.useFoldersForWebFiles);
+
+		// make sure to not ask if user already enabled folders
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
 	}
 
-	async storeConfigurationFile(): Promise<void> {
-		if (!this.portalId || !this.portalName) {
+	async storePortalConfigurationFile(): Promise<void> {
+		if (!this.portalId || !this.portalName || (this.useFoldersForWebFiles && !this.defaultPageTemplate)) {
 			console.error('Could not store configuration file because portalId or portalName are not set.');
 			return;
 		}
 
 		const config: IPortalConfigurationFile = {
 			portalId: this.portalId,
-			portalName: this.portalName
+			portalName: this.portalName,
+			defaultPageTemplateId: this.defaultPageTemplate
 		};
 		const configString = JSON.stringify(config);
 		const configFilePath = this.getConfigurationFilePath();
@@ -193,12 +277,31 @@ export class ConfigurationManager {
 	}
 }
 
-export async function getConsent(question: string): Promise<boolean> {
+export async function getConsent(question: string, storeConsentSettingName: string | undefined = undefined): Promise<boolean> {
 	const options = ['Yes', 'No'];
+
+	// if remember option is set -> offer remember
+	const consentDontAskAgain = 'Yes, don\'t ask again';
+	if (storeConsentSettingName) {
+
+		// skip if consent has been given
+		const consentSetting = await workspace.getConfiguration().get<boolean>(PORTAL_SETTING_PREFIX_ID + '.' + storeConsentSettingName);
+		if (consentSetting) {
+			console.log('[START] Consent ' + storeConsentSettingName + ' has already been given.');
+			return true;
+		}
+
+		options.push(consentDontAskAgain);
+	}
+
 	const answer = await window.showQuickPick(options, { placeHolder: question });
 
-	if (answer && answer === options[0]) {
+	if (answer && answer !== options[1]) {
 		console.log('[START] User consent for ' + question);
+
+		if (answer === consentDontAskAgain) {
+			await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.' + storeConsentSettingName, true);
+		}
 		return true;
 	}
 	return false;

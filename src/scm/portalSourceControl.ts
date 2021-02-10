@@ -24,13 +24,13 @@ import {
 	FOLDER_WEB_FILES,
 	PowerAppsPortalRepository,
 } from './portalRepository';
-import { getFilename, getFileType, PortalData, PortalFileType } from '../models/portalData';
+import { getFileIdFromUri, getFileName, getFileType, PortalData, PortalFileType } from '../models/portalData';
 import { Utils } from '../utils';
 import path = require('path');
 import { ALL_FILES_GLOB } from './afs';
 import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 import * as mime from 'mime-types';
-import { DEFAULT_MIME_TYPE } from '../models/WebFile';
+import { DEFAULT_MIME_TYPE, WebFile } from '../models/WebFile';
 import { PortalIgnoreConfigurationManager } from './portalIgnoreConfigurationManager';
 
 export class PowerAppsPortalSourceControl implements Disposable {
@@ -41,8 +41,15 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	private timeout?: NodeJS.Timer;
 	private portalData!: PortalData;
 	private changedGroup: Set<Uri> = new Set<Uri>();
-	private changedResourceStates: Map<string, SourceControlResourceState> = new Map<string, SourceControlResourceState>();
+	private changedResourceStates: Map<string, SourceControlResourceState> = new Map<
+		string,
+		SourceControlResourceState
+	>();
+	private configurationManager: ConfigurationManager;
 	private portalIgnoreConfigManager: PortalIgnoreConfigurationManager;
+	public useFoldersForWebFiles: boolean;
+	private runPeriodicFetches: boolean;
+	private periodicFetchInterval: NodeJS.Timeout | undefined;
 
 	constructor(
 		context: ExtensionContext,
@@ -59,16 +66,20 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalScm.quickDiffProvider = this.portalRepository;
 		this.portalScm.inputBox.placeholder = 'This feature is not supported';
 		this.portalScm.inputBox.visible = false;
+		this.configurationManager = configurationManager;
+		this.useFoldersForWebFiles = configurationManager.useFoldersForWebFiles || false;
+		this.runPeriodicFetches = configurationManager.runPeriodicFetches;
+		this.periodicFetchInterval = undefined;
 		this.portalIgnoreConfigManager = new PortalIgnoreConfigurationManager();
 		context.subscriptions.push(this.portalScm);
 		this.registerFileSystemWatcher(context, workspaceFolder);
 	}
 
-	private async downloadData(): Promise<PortalData> {
+	private async downloadData(silent: boolean, incrementalRefresh: boolean): Promise<PortalData> {
 		this.refreshStatusBar('$(sync~spin)', `Portal: Downloading`);
 		let result: PortalData;
 		try {
-			result = await this.portalRepository.download();
+			result = await this.portalRepository.download(silent, incrementalRefresh);
 		} catch (error) {
 			this.refreshStatusBar('$(dialog-error)', `Portal: Download Error`);
 			window.showErrorMessage(`Could not download portal data: ${error}`);
@@ -91,7 +102,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		let portalData: PortalData;
 
 		try {
-			portalData = await portalScm.downloadData();
+			portalData = await portalScm.downloadData(false, false);
 		} catch (error) {
 			throw new Error(`[SCM] Could not download portal data: ${error}`);
 		}
@@ -103,7 +114,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// also, this helps activating the extension on future runs.
 		configurationManager.portalId = portalScm.portalRepository.portalId;
 		configurationManager.portalName = portalScm.portalRepository.portalName;
-		await configurationManager.storeConfigurationFile();
+		configurationManager.defaultPageTemplate = portalScm.portalRepository.defaultPageTemplate;
+		await configurationManager.storePortalConfigurationFile();
 
 		portalScm.portalData = portalData;
 
@@ -117,7 +129,9 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	private registerFileSystemWatcher(context: ExtensionContext, workspaceFolder: WorkspaceFolder) {
-		const fileSystemWatcher = workspace.createFileSystemWatcher(new RelativePattern(workspaceFolder, ALL_FILES_GLOB));
+		const fileSystemWatcher = workspace.createFileSystemWatcher(
+			new RelativePattern(workspaceFolder, ALL_FILES_GLOB)
+		);
 		fileSystemWatcher.onDidChange((uri) => {
 			this.onResourceChange(uri);
 		}, context.subscriptions);
@@ -132,7 +146,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			return document.getText();
 		} else {
 			const fileBuffer = await afs.readFile(uri.fsPath);
-			
+
 			if (fileAsBase64) {
 				return fileBuffer.toString(afs.BASE64);
 			} else {
@@ -148,7 +162,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				arguments: [this],
 				title: `${icon} ${text}`,
 				tooltip: 'Download latest portal changes',
-			}
+			},
 		];
 	}
 
@@ -164,50 +178,71 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			} catch (error) {
 				window.showErrorMessage(`Could not commit all documents to Dynamics: ${error}`);
 			}
-			
+
 			try {
 				await this.setPortalData(this.portalRepository.getPortalData(), false);
 			} catch (ex) {
 				window.showErrorMessage(ex);
 			}
 
-			window.showInformationMessage(`Data uploaded`, {modal: false});
+			window.showInformationMessage(`Data uploaded`, { modal: false });
+			this.refresh(true);
 		}
 	}
 
 	private async prepareCommitToRepository() {
-		return await window.withProgress({location: ProgressLocation.SourceControl}, async (progress, cancellationToken) => {
-			for (const changedResource of this.changedResourceStates.values()) {
-				const fileType = getFileType(changedResource.resourceUri);
-				// was deleted?
-				if (changedResource.decorations?.strikeThrough) {
-					try {
-						await this.portalRepository.deleteDocumentInRepository(fileType, changedResource.resourceUri);
-						console.log(`[SCM] Deleting ${changedResource.resourceUri}.`);
-					} catch (error) {
-						window.showErrorMessage(`Could not delete file ${changedResource.resourceUri}. Error: ${error}`);
+		return await window.withProgress(
+			{ location: ProgressLocation.SourceControl },
+			async (progress, cancellationToken) => {
+				for (const changedResource of this.changedResourceStates.values()) {
+					const fileType = getFileType(changedResource.resourceUri);
+					// was deleted?
+					if (changedResource.decorations?.strikeThrough) {
+						try {
+							await this.portalRepository.deleteDocumentInRepository(
+								fileType,
+								changedResource.resourceUri
+							);
+							console.log(`[SCM] Deleting ${changedResource.resourceUri}.`);
+						} catch (error) {
+							window.showErrorMessage(
+								`Could not delete file ${changedResource.resourceUri}. Error: ${error}`
+							);
+						}
+						continue;
 					}
-					continue;
-				}
 
-				const updatedContents = await this.getLocalFile(changedResource.resourceUri, fileType, true);
-				// was the file modified?
-				if (this.portalData.fileExists(changedResource.resourceUri)) {
-					try {
-						await this.portalRepository.updateDocumentInRepository(fileType, changedResource.resourceUri, updatedContents);
-					} catch (error) {
-						window.showErrorMessage(`Could not update file ${changedResource.resourceUri}. Error: ${error}`);
-					}
-				} else {
-					// file added
-					try {
-						await this.portalRepository.addDocumentToRepository(fileType, changedResource.resourceUri, updatedContents);
-					} catch (error) {
-						window.showErrorMessage(`Could not add file ${changedResource.resourceUri}. Error: ${error}`);
+					const updatedContents = await this.getLocalFile(changedResource.resourceUri, fileType, true);
+					// was the file modified?
+					if (this.portalData.fileExists(changedResource.resourceUri)) {
+						try {
+							await this.portalRepository.updateDocumentInRepository(
+								fileType,
+								changedResource.resourceUri,
+								updatedContents
+							);
+						} catch (error) {
+							window.showErrorMessage(
+								`Could not update file ${changedResource.resourceUri}. Error: ${error}`
+							);
+						}
+					} else {
+						// file added
+						try {
+							await this.portalRepository.addDocumentToRepository(
+								fileType,
+								changedResource.resourceUri,
+								updatedContents
+							);
+						} catch (error) {
+							window.showErrorMessage(
+								`Could not add file ${changedResource.resourceUri}. Error: ${error}`
+							);
+						}
 					}
 				}
 			}
-		});
+		);
 	}
 
 	/**
@@ -253,7 +288,11 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	/** Resets the given local file content to the checked-out version. */
-	private async resetFile(fileName: string, fileType: PortalFileType, portalDocument: IPortalDataDocument): Promise<void> {
+	private async resetFile(
+		fileName: string,
+		fileType: PortalFileType,
+		portalDocument: IPortalDataDocument
+	): Promise<void> {
 		const filePath = await this.portalRepository.createLocalResourcePath(fileName, fileType, portalDocument);
 
 		let fileContent: string = '';
@@ -271,15 +310,14 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				break;
 
 			case PortalFileType.webFile:
-				fileName = fileName.toLowerCase();
-				fileContent = this.portalData.data.webFile.get(fileName)?.b64Content || '';
+				const f = <WebFile>portalDocument;
+				fileContent = this.portalData.data.webFile.get(f.fileId)?.b64Content || '';
 				await afs.writeBase64File(filePath, fileContent);
 				break;
 
 			default:
 				break;
 		}
-
 	}
 
 	async tryCheckout(): Promise<void> {
@@ -290,7 +328,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			);
 		} else {
 			try {
-				const newPortalData = await this.downloadData();
+				const newPortalData = await this.downloadData(false, true);
 
 				// force set data (overwrite = true)
 				await this.setPortalData(newPortalData, true);
@@ -300,13 +338,24 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		}
 	}
 
+	// Refreshes the portal data if runPeriodicFetches is true
+	public initializePeriodicFetch() {
+		if (this.runPeriodicFetches && !this.periodicFetchInterval) {
+			console.log('[SCM] Periodic data fetching enabled');
+			this.periodicFetchInterval = setInterval(async () => {
+				console.log('[SCM] Trigger silent portal data fetch');
+				await this.refresh(true);
+			}, 120000);
+		}
+	}
+
 	/**
 	 * Refresh is used when the information on the server may have changed.
 	 * For example another user updates the Fiddle online.
 	 */
-	async refresh(): Promise<void> {
+	public async refresh(silent: boolean): Promise<void> {
 		try {
-			const latestPortalData = await this.downloadData();
+			const latestPortalData = await this.downloadData(silent, silent);
 			await this.setPortalData(latestPortalData, false);
 		} catch (ex) {
 			window.showErrorMessage(ex);
@@ -314,7 +363,9 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	}
 
 	private async setPortalData(newPortalData: PortalData, overwrite: boolean) {
-		console.log(`[SCM] Setting portal data. Overwrite: ${overwrite}.\n[SCM] =========================================`);
+		console.log(
+			`[SCM] Setting portal data. Overwrite: ${overwrite}.\n[SCM] =========================================`
+		);
 		console.log(`\tOld Snippets: ${this.portalData?.data.contentSnippet.size}.`);
 		console.log(`\tNew Snippets: ${newPortalData.data.contentSnippet.size}.`);
 		console.log(`\tOld Templates: ${this.portalData?.data.webTemplate.size}.`);
@@ -334,6 +385,30 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this._onRepositoryChange.fire(this.portalData);
 		this.refreshStatusBar('$(refresh)', `${this.portalData.portalName}@${this.portalData.instanceName}`);
 		await this.tryUpdateChangedGroup();
+
+		if (this.portalScm.count === 0 && this.configurationManager.askForPortalDataFileMigration) {
+			await this.startFileToFolderMigration();
+		}
+	}
+
+	public async startFileToFolderMigration() {
+		console.log('[SCM] Ask for file migration');
+		const loadNewData = await this.configurationManager.askForPortalDataFileMigration();
+		console.log('[SCM] Migration - load new data: ' + loadNewData);
+
+		if (loadNewData) {
+			await this.refresh(false);
+			console.log('[SCM] Migration - Refresh finished');
+
+			const options = ['Apply Changes', 'I\'ll do it myself'];
+			const pickedOption = await window.showInformationMessage('To finish the migration, we have to move the files. Open your source control pane to make sure everything is alright. Once you are ok with the changes click on \'Apply\'.', ...options);
+			console.log('[SCM] Migration - User selection for applying: ' + pickedOption);
+
+			if (pickedOption === options[0]) {
+				await this.resetFilesToCheckedOutVersion();
+				console.log('[SCM] Migration - File changes applied');
+			}
+		}	
 	}
 
 	getWorkspaceFolder(): WorkspaceFolder {
@@ -368,14 +443,12 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	/** This is where the source control determines, which documents were updated, removed, and theoretically added. */
 	async updateChangedGroup(): Promise<void> {
 		// for simplicity we ignore which document was changed in this event and scan all of them
-		
 
 		const uris = this.changedGroup;
 		this.changedGroup = new Set<Uri>();
 
 		try {
-			await window.withProgress({location: ProgressLocation.SourceControl}, async () => {
-
+			await window.withProgress({ location: ProgressLocation.SourceControl }, async () => {
 				// first check all files with a deleted resource state
 				// we want to make sure that are actually deleted
 				for (const [resourceStateKey, deletedFile] of this.changedResourceStates.entries()) {
@@ -385,20 +458,18 @@ export class PowerAppsPortalSourceControl implements Disposable {
 					}
 
 					const fileExistsInPortalData = this.portalData.fileExists(deletedFile.resourceUri);
-					
+
 					// file does still exist in local repo
 					if (fileExistsInPortalData) {
 						continue;
 					} else {
-						// file does not exist in local repo -> remove it from 
+						// file does not exist in local repo -> remove it from
 						// changed resource. In case it has been restored, it will be re
 						this.changedResourceStates.delete(resourceStateKey);
 					}
 				}
 
-
 				for (const uri of uris) {
-
 					// if the current file is not a "portal file" ignore it
 					if (getFileType(uri) === PortalFileType.other) {
 						continue;
@@ -412,7 +483,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 
 					let isDirty: boolean;
 					let wasDeleted: boolean;
-		
+
 					const pathExists = await afs.exists(uri.fsPath);
 					if (pathExists) {
 						const m = mime.lookup(uri.fsPath) || DEFAULT_MIME_TYPE;
@@ -431,11 +502,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
 							const encodedFile = fileBuffer.toString(afs.BASE64);
 							isDirty = this.isDirtyBase64(uri, encodedFile);
 						}
-						
-						
+
 						wasDeleted = false;
 					} else {
-						// does the file exist in the repo? 
+						// does the file exist in the repo?
 						// if it doesn't then we can remove it from scm directly
 						const fileExistsInPortalData = this.portalData.fileExists(uri);
 						if (!fileExistsInPortalData) {
@@ -447,10 +517,10 @@ export class PowerAppsPortalSourceControl implements Disposable {
 							wasDeleted = true;
 						}
 					}
-		
+
 					if (isDirty) {
 						const resourceState = this.toSourceControlResourceState(uri, wasDeleted);
-		
+
 						// use a map to prevent duplicate change entries
 						this.changedResourceStates.set(uri.fsPath, resourceState);
 					} else {
@@ -493,8 +563,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		// if (!originalText) {
 		// 	return true;
 		// }
-		const isDirty =
-			originalText !== doc;
+		const isDirty = originalText !== doc;
 
 		if (isDirty) {
 			console.log(`[SCM]\t${originalDocUri.fsPath} is dirty`);
@@ -506,17 +575,13 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	toSourceControlResourceState(docUri: Uri, deleted: boolean): SourceControlResourceState {
 		const repositoryUri = this.portalRepository.provideOriginalResource(docUri, null);
 
-		const fileName = getFilename(docUri).split('.')[0];
+		const fileName = getFileName(docUri).split('.')[0];
 
 		const command: Command | undefined = !deleted
 			? {
 					title: 'Show changes',
 					command: 'vscode.diff',
-					arguments: [
-						repositoryUri,
-						docUri,
-						`${this.portalData.instanceName} ${fileName} ↔ Local changes`,
-					],
+					arguments: [repositoryUri, docUri, `${this.portalData.instanceName} ${fileName} ↔ Local changes`],
 					tooltip: 'Diff your changes',
 			  }
 			: undefined;
@@ -526,7 +591,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			command: command,
 			decorations: {
 				strikeThrough: deleted,
-				tooltip: 'File was locally deleted.'
+				tooltip: 'File was locally deleted.',
 			},
 		};
 
@@ -542,5 +607,3 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		return this.portalData;
 	}
 }
-
-
