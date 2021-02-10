@@ -218,6 +218,7 @@ export class ConfigurationManager {
 
 		this.d365InstanceName = config.instanceName;
 		this.useFoldersForWebFiles = config.useFoldersForFiles;
+		this.askLegacyWebFilesMigration = false;
 		
 		if (typeof config.crmRegion === 'string') {
 			this.d365CrmRegion = config.crmRegion;
