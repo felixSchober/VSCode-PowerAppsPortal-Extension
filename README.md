@@ -19,7 +19,7 @@ You can modify web files, content snippets and web template code:
 
 ### Add new (Web) File
 
-You can add new web files, new templates and new content snippets. For new content snippets, the language is applied by following the language code from the path
+You can add new web files, new templates and new content snippets. For new content snippets, the language is applied by following the language code from the path.
 
 ![Add new Web File](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/02_feature.gif)
 
@@ -34,6 +34,11 @@ You can delete web files, templates and content snippets.
 You can refresh the remote changes. This will download all files. If there are changes, they will appear in the source control pane.
 
 ![Refresh](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_feature.gif)
+
+
+#### Periodic fetching
+
+By default, the extension will fetch incremental changes made in Dynamics every two minutes. You can change this behavior. Open `.vscode/settings.json` and add the following setting: `"powerappsPortals.runPeriodicFetches": false`
 
 ### Discard local changes
 
@@ -169,6 +174,34 @@ Initial preview release of extension
 ### 0.1.8
 
 - Ignore .DS_Store files
+
+### 0.2.0
+
+**Folder Mode for Web Files**: Web Files are now represented according to the path within the Portal. E.g. if the parent page of an image is called `assets`, the image will now be placed in `Web Files/assets/`. Creating new folder structure also creates the corresponding web page hierarchy in Dynamics. 
+
+![Folder Mode for Web Files](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_release020_folderMode.png)
+
+**Migration for Folder Mode**: There is a migration assistant that asks the user if he wants to migrate from the previous mode to the new folder mode. This assistant is triggered once the source control pane is clear (no changes) and the extension starts.
+
+It is also possible to manually switch by changing a setting `"powerappsPortals.useFoldersForFiles": true`. Then, restart vscode and click on "Discard local changes" once everything is loaded.
+
+
+**Periodic Refresh**: Now, the extension loads data from Dynamics every two minutes to make sure that the data is always at the most recent state. However, for use cases with multiple developers it's still a good idea to use a repository in combination with this extension.
+
+
+**Incremental Refresh**
+When the application reloads, only the most recent changes are loaded. Users can still click on "Refresh" in the source control pane or in the status bar to get a full refresh.
+
+**Hide Commit Warning**
+The warning that committing data will override the data in Dynamics can now be overridden so that it doesn't show each time a user commits something.
+
+![Hide commit warning](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_release020_ConsentCommit.png)
+
+**Inactive Record filtering**
+Inactive records are now filtered out by default.
+
+**Bug Fixes**
+I fixed some of the old bugs but there will be new bugs. Sorry for that ;)
 
 ## Credits
 Icons made by [Freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
