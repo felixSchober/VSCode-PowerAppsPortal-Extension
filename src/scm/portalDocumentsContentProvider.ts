@@ -26,7 +26,7 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 		this._onDidChange.dispose();
 	}
 
-	updated(updatedPortalData: PortalData): void {
+	updated(updatedPortalData: PortalData, useFoldersForWebFiles: boolean): void {
 		for (const updatedDocument of updatedPortalData.data.webTemplate.values()) {
 			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES, updatedDocument.name + '.html');
 			this._onDidChange.fire(Uri.parse(fn));
@@ -38,7 +38,15 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 		}
 
 		for (const updatedFile of updatedPortalData.data.webFile.values()) {
-			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES, updatedFile.d365Note.filename);
+			let fileFolder: string;
+			if (useFoldersForWebFiles) {
+				fileFolder = updatedFile.fullPath;
+			} else {
+				fileFolder = updatedFile.d365Note.filename;
+				const test = updatedFile.d365Note.filename;
+				console.log('TEST');
+			}
+			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES, fileFolder);
 			this._onDidChange.fire(Uri.parse(fn));
 		}
 

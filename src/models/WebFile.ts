@@ -27,7 +27,7 @@ export class WebFile implements IPortalDataDocument {
 			this.fullPath = this.name;
 			this.filePath = '';
 		} else {
-			this.fullPath = this._parentWebPage.getFullPath() + '/' + this.name;
+			this.fullPath = this._parentWebPage.getFullPath() + '/' + this._d365Note.filename;
 			this.filePath = this._parentWebPage.getFullPath();
 		}
 
@@ -55,6 +55,10 @@ export class WebFile implements IPortalDataDocument {
 
 	get d365File(): ID365WebFile {
 		return this._d365File;
+	}
+
+	get fileId(): string {
+		return this.fullPath.toLowerCase();
 	}
 
 	public static getWebFile(webFile: ID365WebFile, webNote: ID365Note, webPageHierarchy: Map<string, WebPage>): WebFile {

@@ -24,13 +24,13 @@ import {
 	FOLDER_WEB_FILES,
 	PowerAppsPortalRepository,
 } from './portalRepository';
-import { getFilename, getFileType, PortalData, PortalFileType } from '../models/portalData';
+import { getFileIdFromUri, getFileName, getFileType, PortalData, PortalFileType } from '../models/portalData';
 import { Utils } from '../utils';
 import path = require('path');
 import { ALL_FILES_GLOB } from './afs';
 import { IPortalDataDocument } from '../models/interfaces/dataDocument';
 import * as mime from 'mime-types';
-import { DEFAULT_MIME_TYPE } from '../models/WebFile';
+import { DEFAULT_MIME_TYPE, WebFile } from '../models/WebFile';
 import { PortalIgnoreConfigurationManager } from './portalIgnoreConfigurationManager';
 
 export class PowerAppsPortalSourceControl implements Disposable {
@@ -46,7 +46,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		SourceControlResourceState
 	>();
 	private portalIgnoreConfigManager: PortalIgnoreConfigurationManager;
-	private useFoldersForWebFiles: boolean;
+	public useFoldersForWebFiles: boolean;
 	private runPeriodicFetches: boolean;
 	private periodicFetchInterval: NodeJS.Timeout | undefined;
 
@@ -66,7 +66,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalScm.inputBox.placeholder = 'This feature is not supported';
 		this.portalScm.inputBox.visible = false;
 		this.useFoldersForWebFiles = configurationManager.useFoldersForWebFiles || false;
-		this.runPeriodicFetches = configurationManager.runPeriodicFetches || true;
+		this.runPeriodicFetches = configurationManager.runPeriodicFetches;
 		this.periodicFetchInterval = undefined;
 		this.portalIgnoreConfigManager = new PortalIgnoreConfigurationManager();
 		context.subscriptions.push(this.portalScm);
@@ -308,8 +308,8 @@ export class PowerAppsPortalSourceControl implements Disposable {
 				break;
 
 			case PortalFileType.webFile:
-				fileName = fileName.toLowerCase();
-				fileContent = this.portalData.data.webFile.get(fileName)?.b64Content || '';
+				const f = <WebFile>portalDocument;
+				fileContent = this.portalData.data.webFile.get(f.fileId)?.b64Content || '';
 				await afs.writeBase64File(filePath, fileContent);
 				break;
 
@@ -549,7 +549,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	toSourceControlResourceState(docUri: Uri, deleted: boolean): SourceControlResourceState {
 		const repositoryUri = this.portalRepository.provideOriginalResource(docUri, null);
 
-		const fileName = getFilename(docUri).split('.')[0];
+		const fileName = getFileName(docUri).split('.')[0];
 
 		const command: Command | undefined = !deleted
 			? {

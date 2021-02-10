@@ -12,7 +12,7 @@ import {
 } from 'vscode';
 import * as path from 'path';
 import { ConfigurationManager } from '../configuration/configurationManager';
-import { getFilename, PortalData, PortalFileType } from '../models/portalData';
+import { getFileIdFromUri, PortalData, PortalFileType } from '../models/portalData';
 import { DynamicsApi } from '../api/dynamicsApi';
 import { ALL_FILES_GLOB, createFolder } from './afs';
 import { WebTemplate } from '../models/WebTemplate';
@@ -136,7 +136,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				// should we create folders?
 				if (this.configurationManager.useFoldersForWebFiles) {
 					// get actual file
-					const webFile = this.portalData?.data.webFile.get(fileName);
+					const webFile = <WebFile>portalDataFile;
 
 					if (webFile) {
 						const webFilePath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, webFile.filePath);
@@ -325,7 +325,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					if (!file || !file.d365Note) {
 						console.error(`Could not get a file.`);
 					}
-					result.data.webFile.set(file.d365Note.filename.toLowerCase(), file);
+					result.data.webFile.set(file.fileId, file);
 				}
 
 				progressMessage += `✓ Files: ${webFiles.length} `;
@@ -386,7 +386,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				} catch (error) {
 					console.error('Could not delete file ' + f.d365Note.filename + ' Error: ' + error);
 				}
-				this.portalData?.data.webFile.delete(f.d365Note.filename);
+				this.portalData?.data.webFile.delete(f.fileId);
 				break;
 
 			default:
@@ -434,7 +434,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				const resultF = await this.updateWebFile(existingFile, updatedFileContent);
 
 				if (resultF) {
-					this.portalData.data.webFile.set(resultF.d365Note.filename, resultF);
+					this.portalData.data.webFile.set(resultF.fileId, resultF);
 					console.log(`\t[REPO] File ${resultF.d365Note.filename} was updated.`);
 				} else {
 					throw new Error(`Could not find file for uri ${uri}`);
@@ -496,7 +496,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			throw Error('Could not update file because portal data in repo class was not set.');
 		}
 
-		const fileName = getFilename(uri, fileType);
+		const fileId = getFileIdFromUri(uri, fileType);
 
 		if (!this.portalId) {
 			throw Error('Portal Id is not specified.');
@@ -507,7 +507,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					_adx_websiteid_value: this.portalId,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
-					adx_name: fileName,
+					adx_name: fileId, // for web template: fileId = fileName
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					adx_source: newFileContent,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -523,7 +523,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				const languageCode = this.portalData.getLanguageFromPath(uri);
 				const localNewSnippet: ID365ContentSnippet = {
 					// eslint-disable-next-line @typescript-eslint/naming-convention
-					adx_name: fileName,
+					adx_name: fileId,  // for contentSnippet: fileId = fileName
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					adx_value: newFileContent,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -544,7 +544,12 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					console.warn('Could not upload file because published state id is not defined.');
 					this.portalData.publishedStateId = await this.d365WebApi.getPublishedPublishStateId(this.portalId);
 				}
-
+				const fileNameParts = fileId.split(path.sep);
+				if (fileNameParts.length < 1) {
+					window.showErrorMessage(`The path of the file to be commited is not formatted correctly. Please try again or report the error. File Path: ${uri.fsPath}. File Id: ${fileId}`);
+					break;
+				}
+				const fileName = fileNameParts[fileNameParts.length - 1];
 				const parentPage = await this.getWebFileLocation(uri, fileName);
 				const localNewNote: ID365Note = {
 					documentbody: newFileContent,
@@ -562,7 +567,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 					this.portalData.publishedStateId,
 					parentPage
 				);
-				this.portalData.data.webFile.set(remoteNewFile.d365Note.filename, remoteNewFile);
+				this.portalData.data.webFile.set(remoteNewFile.fileId, remoteNewFile);
 				console.log(`\t[REPO] File ${remoteNewFile.d365Note.filename} was updated.`);
 				break;
 

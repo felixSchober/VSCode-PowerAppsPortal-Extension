@@ -20,7 +20,7 @@ export class ConfigurationManager {
 
 	// experience settings
 	useFoldersForWebFiles: boolean | undefined;
-	runPeriodicFetches: boolean | undefined;
+	runPeriodicFetches: boolean = false;
 	hideCommitWarning: boolean | undefined;
 
 
@@ -105,10 +105,10 @@ export class ConfigurationManager {
 			const configuration = workspace.getConfiguration(PORTAL_SETTING_PREFIX_ID);
 			this.d365InstanceName = configuration.get<string>('dynamicsInstanceName');
 			this.d365CrmRegion = configuration.get<string>('dynamicsCrmRegion');
-			this.useFoldersForWebFiles = configuration.get<boolean>('useFoldersForFiles') || false;
+			this.useFoldersForWebFiles = configuration.get('useFoldersForFiles');
 
-			this.runPeriodicFetches = configuration.get<boolean>('runPeriodicFetches') || true;
-			this.hideCommitWarning = configuration.get<boolean>('hideCommitWarning') || false;
+			this.runPeriodicFetches = configuration.get('runPeriodicFetches') || false;
+			this.hideCommitWarning = configuration.get('hideCommitWarning');
 
 			aadClientId = configuration.get<string>('aadClientId');
 			aadTenantId = configuration.get<string>('aadTenantId');

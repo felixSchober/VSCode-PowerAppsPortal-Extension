@@ -228,10 +228,10 @@ function registerPowerAppsPortalSourceControl(
 	context: vscode.ExtensionContext
 ) {
 	// update the portal document content provider with the latest content
-	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData());
+	portalDocumentContentProvider.updated(powerappsSourceControl.getPortalData(), powerappsSourceControl.useFoldersForWebFiles);
 
 	// every time the repository is updated with new portalData version, notify the content provider
-	powerappsSourceControl.onRepositoryChange((portalData) => portalDocumentContentProvider.updated(portalData));
+	powerappsSourceControl.onRepositoryChange((portalData) => portalDocumentContentProvider.updated(portalData, powerappsSourceControl.useFoldersForWebFiles));
 
 	if (portalSourceControlRegister.has(powerappsSourceControl.getWorkspaceFolder().uri)) {
 		// the folder was already under source control
@@ -322,7 +322,4 @@ async function chooseWorkspaceFolder() {
 		vscode.window.showErrorMessage('Please pick a folder');
 		return;
 	}
-
-	const test = await vscode.commands.executeCommand('vscode.openFolder', folders[0], useSameWindow);
-	console.log(test);
 }

@@ -30,15 +30,15 @@ export class PortalData {
 
 	public fileExists(uri: Uri): boolean {
 		const fileType = getFileType(uri);
-		let fileName = getFilename(uri, fileType);
+		let fileId = getFileIdFromUri(uri, fileType);
 
 		switch (fileType) {
 			case PortalFileType.contentSnippet:
-				return this.data.contentSnippet.has(fileName);
+				return this.data.contentSnippet.has(fileId);
 			case PortalFileType.webTemplate:
-				return this.data.webTemplate.has(fileName);
+				return this.data.webTemplate.has(fileId);
 			case PortalFileType.webFile:
-				return this.data.webFile.has(fileName);
+				return this.data.webFile.has(fileId);
 			default:
 				return false;
 		}
@@ -65,17 +65,17 @@ export class PortalData {
 	}
 
 	public getContentSnippet(uri: Uri): ContentSnippet | undefined {
-		let fileName = getFilename(uri, PortalFileType.contentSnippet);
+		let fileName = getFileIdFromUri(uri, PortalFileType.contentSnippet);
 		return this.data.contentSnippet.get(fileName);
 	}
 
 	public getWebTemplate(uri: Uri): WebTemplate | undefined {
-		let fileName = getFilename(uri, PortalFileType.webTemplate);
+		let fileName = getFileIdFromUri(uri, PortalFileType.webTemplate);
 		return this.data.webTemplate.get(fileName);
 	}
 
 	public getWebFile(uri: Uri): WebFile | undefined {
-		let fileName = getFilename(uri, PortalFileType.webFile);
+		let fileName = getFileIdFromUri(uri, PortalFileType.webFile);
 		return this.data.webFile.get(fileName);
 	}
 
@@ -138,9 +138,13 @@ export class PortalData {
  * Get the name of the file
  * @param uri document uri
  */
-export function getFilename(uri: Uri, fileType?: PortalFileType): string {
+export function getFileIdFromUri(uri: Uri, fileType?: PortalFileType): string {
 	if (fileType && fileType === PortalFileType.webFile) {
-		return path.basename(uri.fsPath).toLowerCase();
+		const folders = uri.fsPath.split(path.sep);
+		const webFileIndex = folders.indexOf(FOLDER_WEB_FILES);
+		const fileName = folders.slice(webFileIndex + 1);
+		const fn = '/' + fileName.join('/');
+		return fn.toLowerCase();
 	}
 
 	if (fileType === PortalFileType.contentSnippet) {
@@ -153,6 +157,14 @@ export function getFilename(uri: Uri, fileType?: PortalFileType): string {
 		return fn.toLowerCase();
 	}
 	return path.basename(uri.fsPath).split('.')[0].toLowerCase();
+}
+
+export function getFileName(uri: Uri, fileType?: PortalFileType): string {
+	if (fileType && fileType === PortalFileType.webFile) {
+		return path.basename(uri.fsPath).toLowerCase();
+	}
+
+	return getFileIdFromUri(uri, fileType);
 }
 
 export function getFileType(uri: Uri): PortalFileType {
