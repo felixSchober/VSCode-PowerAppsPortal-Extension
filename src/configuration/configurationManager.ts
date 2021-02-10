@@ -19,12 +19,14 @@ export class ConfigurationManager {
 	defaultPageTemplate: string | undefined;
 
 	// experience settings
-	useFoldersForWebFiles: boolean | undefined;
+	useFoldersForWebFiles: boolean;
 	runPeriodicFetches: boolean = false;
 	hideCommitWarning: boolean | undefined;
 
+	askLegacyWebFilesMigration: boolean | undefined;
 
 	constructor(private readonly workspaceFolder: WorkspaceFolder) {
+		this.useFoldersForWebFiles = true;
 	}
 
 	get isConfigured(): boolean {
@@ -105,13 +107,29 @@ export class ConfigurationManager {
 			const configuration = workspace.getConfiguration(PORTAL_SETTING_PREFIX_ID);
 			this.d365InstanceName = configuration.get<string>('dynamicsInstanceName');
 			this.d365CrmRegion = configuration.get<string>('dynamicsCrmRegion');
-			this.useFoldersForWebFiles = configuration.get('useFoldersForFiles');
-
+			const useFolders: boolean | undefined = configuration.get('useFoldersForFiles');
+			if (useFolders === undefined) {
+				this.useFoldersForWebFiles = true;
+			} else{
+				this.useFoldersForWebFiles = useFolders;
+			}
 			this.runPeriodicFetches = configuration.get('runPeriodicFetches') || false;
 			this.hideCommitWarning = configuration.get('hideCommitWarning');
 
+
+
 			aadClientId = configuration.get<string>('aadClientId');
 			aadTenantId = configuration.get<string>('aadTenantId');
+
+			// legacy migration to folders instead of files.
+			// never ask if already enabled
+			if (this.useFoldersForWebFiles) {
+				this.askLegacyWebFilesMigration = false;
+				await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
+			}
+
+			this.askLegacyWebFilesMigration = configuration.get('askLegacyWebFilesMigration');
+			
 
 			if (!aadClientId || !aadTenantId) {
 				throw Error('[CONFIG] Could not load either client id or tenant id from local config store.');
@@ -126,6 +144,36 @@ export class ConfigurationManager {
 
 		// try to also get the portal instance config from the configuration file
 		await this.loadPortalConfigurationFile();
+	}
+
+	public async askForPortalDataFileMigration() : Promise<boolean> {
+		if (!this.askLegacyWebFilesMigration) {
+			return false;
+		}
+
+		const options = ['Yes, migrate now', 'Please ask me next time', 'No, don\'t ask again'];
+		const pickedOption = await window.showInformationMessage('Do you want to migrate your local folder structure for web files? This does not change the structure in Dynamics.', {modal: false}, ...options);
+
+		if (pickedOption === options[0]) {
+			this.migrateToFolderFileStructure();
+			return true;
+		}
+
+		if (pickedOption === options[2]) {
+			await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
+			this.askLegacyWebFilesMigration = false;
+		}
+
+		window.showInformationMessage('You can always migrate yourself by changing the \'powerappsPortals.useFoldersForFiles\' setting.');
+		return false;
+	}
+
+	private async migrateToFolderFileStructure() {		
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.useFoldersForFiles', true);
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
+
+		this.useFoldersForWebFiles = true;
+		this.askLegacyWebFilesMigration = false;
 	}
 
 	private async loadPortalConfigurationFile() {
@@ -198,9 +246,12 @@ export class ConfigurationManager {
 		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.dynamicsInstanceName', this.d365InstanceName);
 		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.dynamicsCrmRegion', this.d365CrmRegion);
 		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.useFoldersForFiles', this.useFoldersForWebFiles);
+
+		// make sure to not ask if user already enabled folders
+		await workspace.getConfiguration().update(PORTAL_SETTING_PREFIX_ID + '.askLegacyWebFilesMigration', false);
 	}
 
-	async storeConfigurationFile(): Promise<void> {
+	async storePortalConfigurationFile(): Promise<void> {
 		if (!this.portalId || !this.portalName || (this.useFoldersForWebFiles && !this.defaultPageTemplate)) {
 			console.error('Could not store configuration file because portalId or portalName are not set.');
 			return;

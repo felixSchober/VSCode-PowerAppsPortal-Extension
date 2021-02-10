@@ -39,6 +39,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 	public portalName: string | undefined;
 	public portalId: string | undefined;
 	public defaultPageTemplate: string | undefined;
+	public lastRefresh: Date | undefined;
 
 	private portalData: PortalData | undefined;
 	public languages: Map<string, ID365PortalLanguage>;
@@ -164,80 +165,70 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName + '.html');
 	}
 
-	public async download(silent: boolean): Promise<PortalData> {
+	public async download(silent: boolean, incrementalRefresh: boolean): Promise<PortalData> {
 		const progressOptions: ProgressOptions = {
 			location: silent ? ProgressLocation.SourceControl : ProgressLocation.Notification,
 			title: 'Downloading',
 			cancellable: true,
 		};
 		this.isDownloadCanceled = false;
+
+		let lastRefreshedDate: string | undefined;
+		if (!incrementalRefresh || !this.lastRefresh) {
+			lastRefreshedDate = undefined;
+		} else {
+			lastRefreshedDate = this.lastRefresh.toISOString();
+			console.log(`[REPO] Restrict to last modified: ${lastRefreshedDate}`);
+		}
 		try {
 			return window.withProgress(progressOptions, async (progress, token) => {
-				token.onCancellationRequested(() => {
-					this.isDownloadCanceled = true;
-					console.log('User canceled the long running operation');
-					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-				});
+				
+				token.onCancellationRequested(() => this.cancelDownload);
 
 				let progressMessage = `Download: `;
 				progress.report({
 					message: progressMessage,
 				});
 
-				let portalId: string | undefined;
-				if (!this.configurationManager.isPortalDataConfigured) {
-					portalId = await this.choosePortal();
+				let portalId: string;
+				try {
+					portalId = await this.downloadPortalId();
+				} catch (error) {
+					return this.cancelDownload();
+				}
+				
+				progress.report({increment: 5});
+
+				// create new portal data if not incremental refresh (e.g. at beginning)
+				let result: PortalData;
+				if (!this.portalData || !incrementalRefresh) {
+					result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+					lastRefreshedDate = undefined;
 				} else {
-					portalId = this.configurationManager.portalId;
-					this.portalName = this.configurationManager.portalName;
-					this.portalId = portalId;
-					this.defaultPageTemplate = this.configurationManager.defaultPageTemplate;
-				}
-
-				if (!portalId) {
-					console.error('[REPO] Could not get portal id either from existing configuration or from user.');
-					return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
-				}
-
-				progress.report({
-					increment: 5,
-				});
-
-				const result = new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+					console.log('[REPO] Incremental refresh -> reuse existing portal data.');
+					result = this.portalData;
+				}				 
 
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-
-				if (this.languages.size === 0) {
-					console.log('[REPO] Getting languages');
-
-					let languages: Map<string, ID365PortalLanguage> = new Map<string, ID365PortalLanguage>();
-					try {
-						languages = await this.d365WebApi.getLanguages(portalId);
-					} catch (error) {
-						window.showErrorMessage(`Could not get portal data: ${error}`);
-						return result;
-					}
-
-					if (languages.size === 0) {
-						window.showWarningMessage(
-							'Could not get any languages from portal. en-us will be set as the default.'
-						);
-					}
-
-					this.languages = languages;
-
-					console.log(`[REPO] Received ${this.languages.size} languages (not all of them active)`);
+				// *************
+				// LANGUAGES
+				// *************
+				try {
+					await this.downloadLanguages(portalId, result);
+				} catch (error) {
+					return result;
 				}
+				progress.report({increment: 10});
 
+				
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progress.report({
-					increment: 10,
-				});
-
+				// *************
+				// PUBLISHED STATE ID
+				// *************
 				let publishedStateId: string;
 				if (this.portalData && this.portalData.publishedStateId) {
 					publishedStateId = this.portalData.publishedStateId;
@@ -250,85 +241,59 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `${this.portalName}:`;
+
+				// *************
+				// TEMPLATES
+				// *************
 				progress.report({
 					increment: 10,
 					message: progressMessage + `… Templates `,
 				});
 
-				result.languages = this.languages;
-				const webTemplates = await this.d365WebApi.getWebTemplates(portalId);
-
+				const numberOfTemplates = await this.downloadWebTemplates(portalId, lastRefreshedDate, result);
+				progressMessage += `✓ Templates: ${numberOfTemplates}`;
+				
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `✓ Templates: ${webTemplates.length}`;
+
+				// *************
+				// SNIPPETS
+				// *************
 				progress.report({
 					increment: 20,
 					message: progressMessage + `… Snippets `,
 				});
-
-				for (const template of webTemplates) {
-					result.data.webTemplate.set(template.name.toLowerCase(), template);
-				}
-
-				const contentSnippets = await this.d365WebApi.getContentSnippets(portalId, this.languages);
+				const numberOfSnippets = await this.downloadContentSnippets(portalId, lastRefreshedDate, result);
+				progressMessage += `✓ Snippets: ${numberOfSnippets}`;
 
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-				progressMessage += `✓ Snippets: ${webTemplates.length}`;
 				progress.report({
 					increment: 25,
 					message: progressMessage + `… Files `,
 				});
 
-				for (const snippet of contentSnippets) {
-					const namePath = snippet.name.split('/');
-
-					// insert language into name path e.g. 'Account/SignIn/PageCopy'
-					// -> 'Account/SignIn/en-us/PageCopy'
-					const name = [
-						...namePath.slice(0, namePath.length - 1),
-						snippet.language,
-						namePath[namePath.length - 1],
-					];
-					result.data.contentSnippet.set(name.join('/').toLowerCase(), snippet);
-				}
+				// *************
+				// WEB PAGES
+				// *************			
+				await this.downloadWebPages(portalId, result);
+				await this.downloadChooseDefaultWebPageRoot(portalId);
 
 				if (this.isDownloadCanceled) {
 					return result;
 				}
-
-				// get web pages				
-				console.log('[REPO] Getting web pages');
-				const webPageHierarchy = await this.d365WebApi.getWebPageHierarchy(portalId);
-				result.webPages = webPageHierarchy;
+				// *************
+				// WEB FILES
+				// *************
 				progress.report({
 					increment: 5,
 					message: progressMessage + `… Files `,
 				});
+				const numberOfWebFiles = await this.downloadWebFiles(portalId, lastRefreshedDate, result);
+				progressMessage += `✓ Files: ${numberOfWebFiles} `;
 
-				if (this.configurationManager.useFoldersForWebFiles && !this.configurationManager.defaultPageTemplate) {
-					console.log('[REPO] default page template not set. Asking user.');
-					
-					// get default page template id
-					this.defaultPageTemplate = await this.chooseDefaultWebTemplateId(portalId, undefined);
-					console.log('[REPO] default page template id set: ' + this.defaultPageTemplate);
-				}
-
-				if (this.isDownloadCanceled) {
-					return result;
-				}
-				const webFiles = await this.d365WebApi.getWebFiles(portalId, webPageHierarchy);
-				for (const file of webFiles) {
-					if (!file || !file.d365Note) {
-						console.error(`Could not get a file.`);
-					}
-					result.data.webFile.set(file.fileId, file);
-				}
-
-				progressMessage += `✓ Files: ${webFiles.length} `;
 				progress.report({
 					increment: 25,
 					message: progressMessage,
@@ -336,8 +301,9 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 				if (!silent) {
 					window.showInformationMessage(progressMessage);
-				}				
+				}			
 
+				this.lastRefresh = new Date();
 				this.portalData = result;
 				return result;
 			});
@@ -346,6 +312,117 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 			throw new Error(error);
 		}
 	}
+
+	private cancelDownload() : PortalData {
+		this.isDownloadCanceled = true;
+		console.log('User canceled the long running operation');
+		if (this.portalData) {
+			return this.portalData;
+		} else {
+			return new PortalData(this.configurationManager.d365InstanceName || '', this.portalName || '');
+		}	
+	}
+
+	private async downloadPortalId(): Promise<string> {
+		let portalId: string | undefined;
+		if (!this.configurationManager.isPortalDataConfigured) {
+			portalId = await this.choosePortal();
+		} else {
+			portalId = this.configurationManager.portalId;
+			this.portalName = this.configurationManager.portalName;
+			this.portalId = portalId;
+			this.defaultPageTemplate = this.configurationManager.defaultPageTemplate;
+		}
+
+		if (!portalId) {
+			throw Error('[REPO] Could not get portal id either from existing configuration or from user.');
+		}
+
+		return portalId;
+	}
+
+	private async downloadLanguages(portalId: string, result: PortalData) {
+		if (this.languages.size === 0) {
+			console.log('[REPO] Getting languages');
+
+			let languages: Map<string, ID365PortalLanguage> = new Map<string, ID365PortalLanguage>();
+			try {
+				languages = await this.d365WebApi.getLanguages(portalId);
+			} catch (error) {
+				window.showErrorMessage(`Could not get portal data: ${error}`);
+				throw error;
+			}
+
+			if (languages.size === 0) {
+				window.showWarningMessage(
+					'Could not get any languages from portal. en-us will be set as the default.'
+				);
+			}
+
+			this.languages = languages;
+			result.languages = this.languages;
+
+			console.log(`[REPO] Received ${this.languages.size} languages (not all of them active)`);
+		}
+	}
+
+	private async downloadWebTemplates(portalId: string, lastRefreshedDate: string | undefined, result: PortalData) : Promise<number> {
+		const webTemplates = await this.d365WebApi.getWebTemplates(portalId, true, lastRefreshedDate);
+		for (const template of webTemplates) {
+			result.data.webTemplate.set(template.name.toLowerCase(), template);
+		}
+		return webTemplates.length;
+	}
+
+	private async downloadContentSnippets(portalId: string, lastRefreshedDate: string | undefined, result: PortalData) : Promise<number> {
+		const contentSnippets = await this.d365WebApi.getContentSnippets(portalId, this.languages, true, lastRefreshedDate);
+
+		for (const snippet of contentSnippets) {
+			const namePath = snippet.name.split('/');
+
+			// insert language into name path e.g. 'Account/SignIn/PageCopy'
+			// -> 'Account/SignIn/en-us/PageCopy'
+			const name = [
+				...namePath.slice(0, namePath.length - 1),
+				snippet.language,
+				namePath[namePath.length - 1],
+			];
+			result.data.contentSnippet.set(name.join('/').toLowerCase(), snippet);
+		}
+		return contentSnippets.length;
+	}
+
+	private async downloadWebPages(portalId: string, result: PortalData) {
+		// get web pages				
+		console.log('[REPO] Getting web pages');
+		const webPageHierarchy = await this.d365WebApi.getWebPageHierarchy(portalId);
+		result.webPages = webPageHierarchy;
+	}
+
+	private async downloadChooseDefaultWebPageRoot(portalId: string) {
+		if (this.configurationManager.useFoldersForWebFiles && !this.configurationManager.defaultPageTemplate) {
+			console.log('[REPO] default page template not set. Asking user.');
+			
+			// get default page template id
+			this.defaultPageTemplate = await this.chooseDefaultWebTemplateId(portalId, undefined);
+			this.configurationManager.defaultPageTemplate = this.defaultPageTemplate;
+			await this.configurationManager.storePortalConfigurationFile();
+			console.log('[REPO] default page template id set: ' + this.defaultPageTemplate);
+		}
+	}
+
+	private async downloadWebFiles(portalId: string, lastRefreshedDate: string | undefined, result: PortalData) : Promise<number> {
+		const webFiles = await this.d365WebApi.getWebFiles(portalId, result.webPages, true, lastRefreshedDate);
+		for (const file of webFiles) {
+			if (!file || !file.d365Note) {
+				console.error(`Could not get a file.`);
+			}
+			result.data.webFile.set(file.fileId, file);
+		}
+		return webFiles.length;
+	}
+
+
 
 	public async deleteDocumentInRepository(fileType: PortalFileType, uri: Uri): Promise<void> {
 		switch (fileType) {

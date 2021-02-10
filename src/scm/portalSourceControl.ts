@@ -45,6 +45,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		string,
 		SourceControlResourceState
 	>();
+	private configurationManager: ConfigurationManager;
 	private portalIgnoreConfigManager: PortalIgnoreConfigurationManager;
 	public useFoldersForWebFiles: boolean;
 	private runPeriodicFetches: boolean;
@@ -65,6 +66,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.portalScm.quickDiffProvider = this.portalRepository;
 		this.portalScm.inputBox.placeholder = 'This feature is not supported';
 		this.portalScm.inputBox.visible = false;
+		this.configurationManager = configurationManager;
 		this.useFoldersForWebFiles = configurationManager.useFoldersForWebFiles || false;
 		this.runPeriodicFetches = configurationManager.runPeriodicFetches;
 		this.periodicFetchInterval = undefined;
@@ -73,11 +75,11 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this.registerFileSystemWatcher(context, workspaceFolder);
 	}
 
-	private async downloadData(silent: boolean): Promise<PortalData> {
+	private async downloadData(silent: boolean, incrementalRefresh: boolean): Promise<PortalData> {
 		this.refreshStatusBar('$(sync~spin)', `Portal: Downloading`);
 		let result: PortalData;
 		try {
-			result = await this.portalRepository.download(silent);
+			result = await this.portalRepository.download(silent, incrementalRefresh);
 		} catch (error) {
 			this.refreshStatusBar('$(dialog-error)', `Portal: Download Error`);
 			window.showErrorMessage(`Could not download portal data: ${error}`);
@@ -100,7 +102,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		let portalData: PortalData;
 
 		try {
-			portalData = await portalScm.downloadData(false);
+			portalData = await portalScm.downloadData(false, false);
 		} catch (error) {
 			throw new Error(`[SCM] Could not download portal data: ${error}`);
 		}
@@ -113,7 +115,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		configurationManager.portalId = portalScm.portalRepository.portalId;
 		configurationManager.portalName = portalScm.portalRepository.portalName;
 		configurationManager.defaultPageTemplate = portalScm.portalRepository.defaultPageTemplate;
-		await configurationManager.storeConfigurationFile();
+		await configurationManager.storePortalConfigurationFile();
 
 		portalScm.portalData = portalData;
 
@@ -326,7 +328,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 			);
 		} else {
 			try {
-				const newPortalData = await this.downloadData(false);
+				const newPortalData = await this.downloadData(false, true);
 
 				// force set data (overwrite = true)
 				await this.setPortalData(newPortalData, true);
@@ -353,7 +355,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
 	 */
 	public async refresh(silent: boolean): Promise<void> {
 		try {
-			const latestPortalData = await this.downloadData(silent);
+			const latestPortalData = await this.downloadData(silent, silent);
 			await this.setPortalData(latestPortalData, false);
 		} catch (ex) {
 			window.showErrorMessage(ex);
@@ -383,6 +385,30 @@ export class PowerAppsPortalSourceControl implements Disposable {
 		this._onRepositoryChange.fire(this.portalData);
 		this.refreshStatusBar('$(refresh)', `${this.portalData.portalName}@${this.portalData.instanceName}`);
 		await this.tryUpdateChangedGroup();
+
+		if (this.portalScm.count === 0 && this.configurationManager.askForPortalDataFileMigration) {
+			await this.startFileToFolderMigration();
+		}
+	}
+
+	public async startFileToFolderMigration() {
+		console.log('[SCM] Ask for file migration');
+		const loadNewData = await this.configurationManager.askForPortalDataFileMigration();
+		console.log('[SCM] Migration - load new data: ' + loadNewData);
+
+		if (loadNewData) {
+			await this.refresh(false);
+			console.log('[SCM] Migration - Refresh finished');
+
+			const options = ['Apply Changes', 'I\'ll do it myself'];
+			const pickedOption = await window.showInformationMessage('To finish the migration, we have to move the files. Open your source control pane to make sure everything is alright. Once you are ok with the changes click on \'Apply\'.', ...options);
+			console.log('[SCM] Migration - User selection for applying: ' + pickedOption);
+
+			if (pickedOption === options[0]) {
+				await this.resetFilesToCheckedOutVersion();
+				console.log('[SCM] Migration - File changes applied');
+			}
+		}	
 	}
 
 	getWorkspaceFolder(): WorkspaceFolder {

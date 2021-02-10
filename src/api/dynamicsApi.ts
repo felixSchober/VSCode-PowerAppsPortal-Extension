@@ -210,7 +210,9 @@ export class DynamicsApi {
 
 	public async getContentSnippets(
 		websiteId: string,
-		languages: Map<string, ID365PortalLanguage>
+		languages: Map<string, ID365PortalLanguage>,
+		filterInactive: boolean = true,
+		filterLastRefreshed: string | undefined = undefined
 	): Promise<Array<ContentSnippet>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_contentsnippets',
@@ -218,8 +220,11 @@ export class DynamicsApi {
 			filter: '_adx_websiteid_value eq ' + websiteId,
 			timeout: this.defaultRequestTimeout,
 		};
+
+		this.addStandardFilters(filterInactive, filterLastRefreshed, request);
+
 		const response = await this.webApi.retrieveAllRequest<ID365ContentSnippet>(request);
-		if (!response.value || response.value?.length === 0) {
+		if (!response.value) {
 			throw Error(`Could not get content snippets from dynamics instance for website with id ${websiteId}.`);
 		}
 
@@ -292,30 +297,34 @@ export class DynamicsApi {
 		await this.webApi.deleteRequest(request);
 	}
 
-	public async getPageTemplates(websiteId: string): Promise<Array<ID365PageTemplate>> {
+	public async getPageTemplates(websiteId: string, filterInactive: boolean = true, filterLastRefreshed: string | undefined = undefined): Promise<Array<ID365PageTemplate>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_pagetemplates',
 			select: PAGETEMPLATE_SELECT,
 			filter: '_adx_websiteid_value eq ' + websiteId,
 		};
 
+		this.addStandardFilters(filterInactive, filterLastRefreshed, request);
+
 		const response = await this.webApi.retrieveAllRequest<ID365PageTemplate>(request);
-		if (!response.value || response.value?.length === 0) {
+		if (!response.value) {
 			throw Error(`Could not get page templates from dynamics instance for website with id ${websiteId}.`);
 		}
 
 		return response.value;
 	}
 
-	public async getWebTemplates(websiteId: string): Promise<Array<WebTemplate>> {
+	public async getWebTemplates(websiteId: string, filterInactive: boolean = true, filterLastRefreshed: string | undefined = undefined): Promise<Array<WebTemplate>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webtemplates',
 			select: WEBTEMPLATE_SELECT,
 			filter: '_adx_websiteid_value eq ' + websiteId,
 		};
 
+		this.addStandardFilters(filterInactive, filterLastRefreshed, request);
+
 		const response = await this.webApi.retrieveAllRequest<ID365WebTemplate>(request);
-		if (!response.value || response.value?.length === 0) {
+		if (!response.value) {
 			throw Error(`Could not get web templates from dynamics instance for website with id ${websiteId}.`);
 		}
 
@@ -382,13 +391,15 @@ export class DynamicsApi {
 		await this.webApi.deleteRequest(fileRequest);
 	}
 
-	public async getWebFiles(portalId: string, webPageHierarchy: Map<string, WebPage>): Promise<Array<WebFile>> {
+	public async getWebFiles(portalId: string, webPageHierarchy: Map<string, WebPage>, filterInactive: boolean = true, filterLastRefreshed: string | undefined = undefined): Promise<Array<WebFile>> {
 		const request: RetrieveMultipleRequest = {
 			select: ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value', '_adx_parentpageid_value'],
 			filter: '_adx_websiteid_value eq ' + portalId,
 			collection: 'adx_webfiles',
 			timeout: this.defaultRequestTimeout,
 		};
+
+		this.addStandardFilters(filterInactive, filterLastRefreshed, request);
 
 		console.log('[D365 API] Getting web file');
 		const response = await this.webApi.retrieveAllRequest<ID365WebFile>(request);
@@ -421,20 +432,22 @@ export class DynamicsApi {
 				continue;
 			}
 
-			const wf = WebFile.getWebFile(webFile, note, webPageHierarchy);
+			const wf = WebFile.getWebFile(this.configurationManager.useFoldersForWebFiles, webFile, note, webPageHierarchy);
 			result.push(wf);
 		}
 
 		return result;
 	}
 
-	public async getWebFileNotes(): Promise<Array<ID365Note>> {
+	public async getWebFileNotes(filterLastRefreshed: string | undefined = undefined): Promise<Array<ID365Note>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'annotations',
 			filter: `objecttypecode eq 'adx_webfile' and isdocument eq true`,
 			select: NOTE_SELECT,
 			timeout: this.defaultRequestTimeout,
 		};
+
+		this.addStandardFilters(false, filterLastRefreshed, request);
 
 		const response = await this.webApi.retrieveAllRequest<ID365Note>(request);
 
@@ -462,7 +475,7 @@ export class DynamicsApi {
 		const createdNote = await this.createNote(note, file.adx_webfileid);
 
 		console.log('\t[D365 API] Uploaded file: ' + createdNote.filename);
-		return new WebFile(file, createdNote, parentPage);
+		return new WebFile(this.configurationManager.useFoldersForWebFiles, file, createdNote, parentPage);
 	}
 
 	public async updateFiles(files: Array<ID365Note>): Promise<Array<ID365Note>> {
@@ -550,5 +563,15 @@ export class DynamicsApi {
 
 		const adal = new CrmAdalConnectionSettings(this.configurationManager);
 		return adal;
+	}
+
+	private addStandardFilters(filterInactive: boolean, lastModified: string | undefined, request: RetrieveMultipleRequest) {
+		if (filterInactive) {
+			request.filter += ' and statecode eq 0';
+		}
+
+		if (lastModified) {
+			request.filter += ` and modifiedon ge '${lastModified}'`;
+		}
 	}
 }

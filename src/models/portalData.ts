@@ -28,6 +28,10 @@ export class PortalData {
 		};
 	}
 
+	public get numberOfDocuments(): number {
+		return this.data.contentSnippet.size + this.data.webFile.size + this.data.webTemplate.size;
+	}
+
 	public fileExists(uri: Uri): boolean {
 		const fileType = getFileType(uri);
 		let fileId = getFileIdFromUri(uri, fileType);
@@ -100,6 +104,10 @@ export class PortalData {
 
 	public getWebPageFromPartialFilePath(folders: string[]): WebPage | undefined {
 		const folderName = folders[folders.length - 1];
+
+		if (folderName === FOLDER_WEB_FILES) {
+			return this.getRootWebPage();
+		}
 
 		// try to find this web page based on folder name
 		let parentWebPage: WebPage | undefined;

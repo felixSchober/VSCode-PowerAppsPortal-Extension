@@ -2,7 +2,7 @@
 	"name": "powerapps-portal-local-development",
 	"displayName": "PowerApps Portal Local Development",
 	"description": "Local source control of power apps portals code including web files like images or style sheets, web templates and content snippets.",
-	"version": "0.1.8",
+	"version": "0.2.0",
 	"icon": "resources/icons/icon.png",
 	"homepage": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
 	"bugs": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/issues",
@@ -125,6 +125,11 @@
 					"type": "boolean",
 					"default": false,
 					"description": "If true it will no longer show the warning when committing data to the portal."
+				},
+				"powerappsPortals.askLegacyWebFilesMigration": {
+					"type": "boolean",
+					"default": true,
+					"description": "If true this setting will make sure to ask the user if he wants to migrate his workspace to use the new folder mode instead of the flat file mode"
 				}
 			}
 		},

@@ -144,6 +144,8 @@ async function commandCommit(sourceControlPane: vscode.SourceControl) {
 	const sourceControl = await pickSourceControl(sourceControlPane);
 	if (sourceControl) {
 		sourceControl.commitAll();
+	} else {
+		vscode.window.showErrorMessage('Something really strange has happened - The source control pane went missing. Can you try to restart VsCode?');
 	}
 }
 

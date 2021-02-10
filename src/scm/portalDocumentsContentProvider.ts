@@ -43,8 +43,6 @@ export class PowerAppsPortalDocumentContentProvider implements TextDocumentConte
 				fileFolder = updatedFile.fullPath;
 			} else {
 				fileFolder = updatedFile.d365Note.filename;
-				const test = updatedFile.d365Note.filename;
-				console.log('TEST');
 			}
 			const fn = path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES, fileFolder);
 			this._onDidChange.fire(Uri.parse(fn));
