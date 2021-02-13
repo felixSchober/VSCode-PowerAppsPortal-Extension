@@ -185,9 +185,10 @@
 		"webpack-cli": "^4.2.0"
 	},
 	"dependencies": {
+		"@azure/msal-node": "^1.0.0-beta.6",
 		"adal-node": "^0.2.1",
 		"dynamics-web-api": "^1.7.1",
-		"mime-types": "^2.1.27",
-		"keytar": "^7.3.0"
+		"keytar": "^7.3.0",
+		"mime-types": "^2.1.27"
 	}
 }
