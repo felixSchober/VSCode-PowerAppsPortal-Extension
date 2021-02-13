@@ -28,7 +28,7 @@ const credentialsSection = 'vscode.powerapps-portals-development';
 
 export class CredentialManager {
 
-	private creds: ICredentials;
+	private credentials: ICredentials;
 	public aadTenantId: string;
 	public aadClientId: string;
 	
@@ -36,23 +36,23 @@ export class CredentialManager {
 		this.aadClientId = aadClientId;
 		this.aadTenantId = aadTenantId;
 
-		this.creds = {
+		this.credentials = {
 			aadTenantId: aadTenantId,
 			clientId: aadClientId,
-			clientSecret: ''
+			secret: ''
 		};
 	}
 
 	get isConfigured(): boolean {
-		if (this.aadTenantId && this.aadClientId && this.creds.clientSecret){
+		if (this.aadTenantId && this.aadClientId && this.credentials.secret){
 			return true;
 		}
 		return false;
 	}
 
-	public async setClientSecret(clientSecret: string) {
-		this.creds.clientSecret = clientSecret;
-		await this.storeSecret(this.aadClientId, clientSecret);
+	public async setSecret(secret: string) {
+		this.credentials.secret = secret;
+		await this.storeSecret(this.aadClientId, secret);
 	}
 
 	public async loadCredentials() {
@@ -60,12 +60,12 @@ export class CredentialManager {
 		if (!secret || secret === null) {
 			return;
 		}
-		this.creds.clientSecret = secret;
+		this.credentials.secret = secret;
 	}
 
 	public getCredentials(): ICredentials | undefined {
 		if (this.isConfigured) {
-			return this.creds;
+			return this.credentials;
 		}
 		
 		return undefined;

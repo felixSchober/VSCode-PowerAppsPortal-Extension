@@ -227,7 +227,7 @@ export class ConfigurationManager {
 		}
 
 		this.credentialManager = new CredentialManager(config.aadTenantId, config.aadClientId);
-		this.credentialManager.setClientSecret(config.aadClientSecret);
+		this.credentialManager.setSecret(config.aadClientSecret);
 
 		await this.storeConfiguration();
 	}
