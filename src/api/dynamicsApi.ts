@@ -8,6 +8,7 @@ import {
 } from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
+import { IXrmAuthenticationProvider } from '../models/interfaces/authenticationProvider';
 import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
 import { ID365Note, NOTE_SELECT } from '../models/interfaces/d365Note';
@@ -20,7 +21,9 @@ import { ID365WebTemplate, WEBTEMPLATE_SELECT } from '../models/interfaces/d365W
 import { WebFile } from '../models/WebFile';
 import { WebPage } from '../models/webPage';
 import { WebTemplate } from '../models/WebTemplate';
-import { CrmAdalConnectionSettings } from './adalConnection';
+import { XrmAdalClientCredentialsAuthentication } from './adalConnection';
+import { XrmAdalDeviceCredentialsAuthentication } from './adalDeviceAuthentication';
+import { MsalConnection } from './msalConnection';
 
 export class DynamicsApi {
 	private webApi: DynamicsWebApi;
@@ -31,7 +34,7 @@ export class DynamicsApi {
 	private defaultRequestTimeout: number = 5000;
 	constructor(configurationManager: ConfigurationManager) {
 		this.configurationManager = configurationManager;
-		const adalConnect = this.getAdalConnection();
+		const authProvider = this.getAdalDeviceCodeConnection();
 
 		this.d365InstanceName = this.configurationManager.d365InstanceName;
 		this.d365CrmRegion = this.configurationManager.d365CrmRegion;
@@ -39,7 +42,7 @@ export class DynamicsApi {
 		const webApiUrl = `https://${this.d365InstanceName}.${this.d365CrmRegion}.dynamics.com/api/data/v9.1/`;
 		this.webApi = new dynamicsWebApi({
 			webApiUrl: webApiUrl,
-			onTokenRefresh: (callback: any) => adalConnect.acquireToken(callback),
+			onTokenRefresh: (callback: any) => authProvider.acquireToken(callback),
 		});
 	}
 
@@ -556,12 +559,30 @@ export class DynamicsApi {
 		return requestResponse;
 	}
 
-	private getAdalConnection(): CrmAdalConnectionSettings {
+	private getMsalConnection(): IXrmAuthenticationProvider {
 		if (!this.configurationManager || !this.configurationManager.isConfigured) {
-			throw Error('[D365 API] Configuration was not done');
+			throw Error('[D365 API - MSAL] Configuration was not done');
 		}
 
-		const adal = new CrmAdalConnectionSettings(this.configurationManager);
+		const msal = new MsalConnection(this.configurationManager);
+		return msal;
+	}
+
+	private getAdalClientCredentialsConnection(): IXrmAuthenticationProvider {
+		if (!this.configurationManager || !this.configurationManager.isConfigured) {
+			throw Error('[D365 API - ADAL] Configuration was not done');
+		}
+
+		const adal = new XrmAdalClientCredentialsAuthentication(this.configurationManager);
+		return adal;
+	}
+
+	private getAdalDeviceCodeConnection(): IXrmAuthenticationProvider {
+		if (!this.configurationManager || !this.configurationManager.isConfigured) {
+			throw Error('[D365 API - ADAL] Configuration was not done');
+		}
+
+		const adal = new XrmAdalDeviceCredentialsAuthentication(this.configurationManager);
 		return adal;
 	}
 
