@@ -197,7 +197,13 @@ async function initializeFolderFromConfiguration(
 	context: vscode.ExtensionContext
 ): Promise<void> {
 	console.log('[START] Try initializing folder from configuration');
-	await configurationManager.load(context, false);
+
+	try {
+		await configurationManager.load(context, false);
+	} catch (error) {
+		vscode.window.showErrorMessage(`Could not load configuration. Please try running the command >PowerApps Portals: Configure again.`);
+		return;
+	}
 
 	console.log(
 		`[START] Configuration\n\tInstance Status: ${
@@ -206,6 +212,7 @@ async function initializeFolderFromConfiguration(
 	);
 	if (!configurationManager.isConfigured || !configurationManager.isPortalDataConfigured) {
 		console.log('[START] Could not load config. Manual config required.');
+		vscode.window.showErrorMessage(`Could not load configuration. Please try to restart VSCode and run the command >PowerApps Portals: Configure again.`);
 		return;
 	}
 

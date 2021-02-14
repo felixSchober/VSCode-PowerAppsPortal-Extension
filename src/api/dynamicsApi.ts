@@ -1,12 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 var dynamicsWebApi = require('dynamics-web-api');
-import {
-	CreateRequest,
-	DeleteRequest,
-	RetrieveMultipleRequest,
-	UpdateRequest,
-} from 'dynamics-web-api';
-import { ConfigurationManager } from '../configuration/configurationManager';
+import { CreateRequest, DeleteRequest, RetrieveMultipleRequest, UpdateRequest } from 'dynamics-web-api';
+import { AuthenticationMethod, ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
 import { IXrmAuthenticationProvider } from '../models/interfaces/authenticationProvider';
 import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
@@ -34,7 +29,7 @@ export class DynamicsApi {
 	private defaultRequestTimeout: number = 5000;
 	constructor(configurationManager: ConfigurationManager) {
 		this.configurationManager = configurationManager;
-		const authProvider = this.getAdalDeviceCodeConnection();
+		const authProvider = this.chooseAuthenticationProvider();
 
 		this.d365InstanceName = this.configurationManager.d365InstanceName;
 		this.d365CrmRegion = this.configurationManager.d365CrmRegion;
@@ -44,6 +39,12 @@ export class DynamicsApi {
 			webApiUrl: webApiUrl,
 			onTokenRefresh: (callback: any) => authProvider.acquireToken(callback),
 		});
+	}
+
+	private chooseAuthenticationProvider(): IXrmAuthenticationProvider {
+		return this.configurationManager.authenticationMethod === AuthenticationMethod.clientCredentials
+			? this.getAdalClientCredentialsConnection()
+			: this.getAdalDeviceCodeConnection();
 	}
 
 	public async getLanguages(portalId: string): Promise<Map<string, ID365PortalLanguage>> {
@@ -175,7 +176,6 @@ export class DynamicsApi {
 
 		if (newWebPage._adx_parentpageid_value) {
 			webPageCreateModel['adx_parentpageid@odata.bind'] = `adx_webpages(${newWebPage._adx_parentpageid_value})`;
-
 		}
 
 		const request: CreateRequest = {
@@ -300,7 +300,11 @@ export class DynamicsApi {
 		await this.webApi.deleteRequest(request);
 	}
 
-	public async getPageTemplates(websiteId: string, filterInactive: boolean = true, filterLastRefreshed: string | undefined = undefined): Promise<Array<ID365PageTemplate>> {
+	public async getPageTemplates(
+		websiteId: string,
+		filterInactive: boolean = true,
+		filterLastRefreshed: string | undefined = undefined
+	): Promise<Array<ID365PageTemplate>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_pagetemplates',
 			select: PAGETEMPLATE_SELECT,
@@ -317,7 +321,11 @@ export class DynamicsApi {
 		return response.value;
 	}
 
-	public async getWebTemplates(websiteId: string, filterInactive: boolean = true, filterLastRefreshed: string | undefined = undefined): Promise<Array<WebTemplate>> {
+	public async getWebTemplates(
+		websiteId: string,
+		filterInactive: boolean = true,
+		filterLastRefreshed: string | undefined = undefined
+	): Promise<Array<WebTemplate>> {
 		const request: RetrieveMultipleRequest = {
 			collection: 'adx_webtemplates',
 			select: WEBTEMPLATE_SELECT,
@@ -394,7 +402,12 @@ export class DynamicsApi {
 		await this.webApi.deleteRequest(fileRequest);
 	}
 
-	public async getWebFiles(portalId: string, webPageHierarchy: Map<string, WebPage>, filterInactive: boolean = true, filterLastRefreshed: string | undefined = undefined): Promise<Array<WebFile>> {
+	public async getWebFiles(
+		portalId: string,
+		webPageHierarchy: Map<string, WebPage>,
+		filterInactive: boolean = true,
+		filterLastRefreshed: string | undefined = undefined
+	): Promise<Array<WebFile>> {
 		const request: RetrieveMultipleRequest = {
 			select: ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value', '_adx_parentpageid_value'],
 			filter: '_adx_websiteid_value eq ' + portalId,
@@ -435,7 +448,12 @@ export class DynamicsApi {
 				continue;
 			}
 
-			const wf = WebFile.getWebFile(this.configurationManager.useFoldersForWebFiles, webFile, note, webPageHierarchy);
+			const wf = WebFile.getWebFile(
+				this.configurationManager.useFoldersForWebFiles,
+				webFile,
+				note,
+				webPageHierarchy
+			);
 			result.push(wf);
 		}
 
@@ -586,7 +604,11 @@ export class DynamicsApi {
 		return adal;
 	}
 
-	private addStandardFilters(filterInactive: boolean, lastModified: string | undefined, request: RetrieveMultipleRequest) {
+	private addStandardFilters(
+		filterInactive: boolean,
+		lastModified: string | undefined,
+		request: RetrieveMultipleRequest
+	) {
 		if (filterInactive) {
 			request.filter += ' and statecode eq 0';
 		}

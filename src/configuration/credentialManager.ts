@@ -1,6 +1,7 @@
 import { ICredentials } from "../models/interfaces/credentials";
 import * as keytarType from 'keytar';
 import { env } from 'vscode';
+import { AuthenticationMethod } from "./configurationManager";
 
 const keytar = getNodeModule<typeof keytarType>('keytar');
 
@@ -31,10 +32,12 @@ export class CredentialManager {
 	private credentials: ICredentials;
 	public aadTenantId: string;
 	public aadClientId: string;
+	private authenticationMethod: AuthenticationMethod;
 	
-	constructor(aadTenantId: string, aadClientId: string) {
+	constructor(aadTenantId: string, aadClientId: string, authenticationMethod: AuthenticationMethod | undefined) {
 		this.aadClientId = aadClientId;
 		this.aadTenantId = aadTenantId;
+		this.authenticationMethod  = authenticationMethod || AuthenticationMethod.clientCredentials;
 
 		this.credentials = {
 			aadTenantId: aadTenantId,
@@ -44,19 +47,26 @@ export class CredentialManager {
 	}
 
 	get isConfigured(): boolean {
-		if (this.aadTenantId && this.aadClientId && this.credentials.secret){
-			return true;
+		if (this.authenticationMethod === AuthenticationMethod.clientCredentials) {
+			if (this.aadTenantId && this.aadClientId && this.credentials.secret){
+				return true;
+			}
+		} else {
+			if (this.aadTenantId && this.aadClientId){
+				return true;
+			}
+
 		}
 		return false;
 	}
 
 	public async setSecret(secret: string) {
 		this.credentials.secret = secret;
-		await this.storeSecret(this.aadClientId, secret);
+		await this.storeSecret(secret);
 	}
 
 	public async loadCredentials() {
-		const secret = await this.getSecret(this.aadClientId);
+		const secret = await this.getSecret();
 		if (!secret || secret === null) {
 			return;
 		}
@@ -71,23 +81,27 @@ export class CredentialManager {
 		return undefined;
 	}
 
-	private async getSecret(aadClientId: string): Promise<string | null> {
+	private get keyPhraseName(): string {
+		return (this.authenticationMethod === AuthenticationMethod.clientCredentials ? '' : 'r_') + this.aadClientId;
+	}
+
+	private async getSecret(): Promise<string | null> {
 		if (!keytar) {
 			return null;
 		}
 
 		try {
-			return await keytar.getPassword(credentialsSection, aadClientId);
+			return await keytar.getPassword(credentialsSection, this.keyPhraseName);
 		} catch (err) {
 			// ignore
 		}
 		return null;
 	}
 
-	private async storeSecret(aadClientId: string, clientSecret: string) {
+	private async storeSecret(clientSecret: string) {
 		if (keytar) {
 			try {
-				await keytar.setPassword(credentialsSection, aadClientId, clientSecret);
+				await keytar.setPassword(credentialsSection, this.keyPhraseName, clientSecret);
 			} catch (err) {
 				// ignore
 			}

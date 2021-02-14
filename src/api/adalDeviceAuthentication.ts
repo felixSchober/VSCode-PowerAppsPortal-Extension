@@ -3,8 +3,6 @@ import { OnTokenAcquiredCallback } from "dynamics-web-api";
 import { ConfigurationManager } from "../configuration/configurationManager";
 import { IXrmAuthenticationProvider } from "../models/interfaces/authenticationProvider";
 import * as vscode from 'vscode';
-import * as jwt from 'jsonwebtoken';
-import { JsonWebTokenError } from "jsonwebtoken";
 
 export class XrmAdalDeviceCredentialsAuthentication implements IXrmAuthenticationProvider {
 	instanceName: string;
@@ -79,18 +77,23 @@ export class XrmAdalDeviceCredentialsAuthentication implements IXrmAuthenticatio
 
 	}
 
-	private loginWithDeviceCodeFlow(): Promise<string> {
+	private async loginWithDeviceCodeFlow(): Promise<string> {
 		return new Promise((resolve, reject) => {
 			console.log('[AUTH] Beginning authentication with device flow');
-			this.adalContext.acquireUserCode(this.resourceUrl, this.aadClientId, 'en-us', (error: Error, response: UserCodeInfo) => {
+			this.adalContext.acquireUserCode(this.resourceUrl, this.aadClientId, 'en-us', async (error: Error, response: UserCodeInfo) => {
 				if (error) {
 					console.error('[AUTH] Error when acquiring user code');
 					console.error(error);
 					reject(error.message);
 				} else{
 					console.log('[AUTH] calling acquire token with device code');
-					vscode.env.openExternal(vscode.Uri.parse(`${response.verificationUrl}`));
-					vscode.window.showInformationMessage(`Copy & Paste this code ${response.userCode} into your browser window to login. (If no browser opened, go to aka.ms/devicelogin to type in the code.)`);
+					try {
+						await this.startUserFlow(response.userCode, response.verificationUrl);
+					} catch (error) {
+						reject(error);
+						return;
+					}
+
 					this.adalContext.acquireTokenWithDeviceCode(
 						this.resourceUrl,
 						this.aadClientId,
@@ -117,6 +120,19 @@ export class XrmAdalDeviceCredentialsAuthentication implements IXrmAuthenticatio
 				
 			});
 		});
+	}
+
+	private async startUserFlow(userCode: string, verificationUrl: string) {
+		const msg = `Copy & Paste this code -> ${userCode} <-. Then, click on ok and paste the code into your browser window. (If no browser opened, go to aka.ms/devicelogin to type in the code.)`;
+		const openBrowser = await vscode.window.showInformationMessage(msg, 'Ok', 'Cancel');
+
+		if (openBrowser && openBrowser === 'Ok') {
+			vscode.env.openExternal(vscode.Uri.parse(`${verificationUrl}`));
+		}
+
+		if (openBrowser && openBrowser === 'Cancel') {
+			throw new Error('User Canceled');
+		}
 	}
 
 	private tryGetAccessToken(): Promise<string | undefined> {
