@@ -49,6 +49,55 @@ Within the source control pane, you can click discard to discard all your local 
 
 ## Setup
 
+Go to the [VSCode Marketplace page of the extension](https://marketplace.visualstudio.com/items?itemName=FelixSchober.powerapps-portal-local-development) and install the extension.
+
+After installing, open the command prompt (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>PowerApps Portals: Configure`. Follow the setup instructions below and choose your authentication method.
+
+### Authentication
+There are two methods you can use to connect this extension with your CDS/Dynamics instance.
+
+- User Account
+- Application User
+
+In most cases, user account will be the preferred method because it's easier to setup and all the changes will be in the user context. 
+
+### User Account (Device Code)
+
+This extension connects to your CDS/Dynamics instance with a [Device Code](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code) flow. This means that in order to connect to your instance you need to have the following information ready:
+
+- Client Id (Azure Active Directory)
+- Tenant Id (Azure Active Directory)
+- URL of your instance (Dynamics)
+
+#### User Account - Create AAD App
+
+To setup an app registration, just follow these steps:
+
+![AAD App Registration Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_3.gif)
+
+**Summary:**
+
+- Create new app registration
+- Add Dynamics CRM Api permission (user impersonation)
+- Change app to public client
+- Copy app and tenant id (needed for setup)
+
+
+#### User Account - Extension Setup
+
+Open the command prompt in VSCode (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>PowerApps Portals: Configure`
+
+![Extension Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_1.gif)
+
+After the initial setup the extension will prompt you to copy a code and click on Ok to open the browser
+
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
+
+
+Congratulations! The setup is finished.
+
+### Application User (Client Credentials) 
+
 This extension connects to your CDS/Dynamics instance with a [client credentials authentication](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow) flow. This means that in order to connect to your instance you need to have the following information ready:
 
 - Client Id (Azure Active Directory)
@@ -60,7 +109,7 @@ If you already have an application user in Dynamics connected to an app registra
 
 If you do not have this yet, then follow this guide to set everything up:
 
-### Create AAD App
+#### Application User - Create AAD App
 First, you have to create a new 'Application Registration' in Azure Active Directory. 
 
 Follow the guide on the official Microsoft documentation: [Tutorial: Register an app with Azure Active Directory
@@ -81,7 +130,7 @@ Finally, to obtain all Ids you need in the following step, go to the **Overview*
 
 ![Application Id and Tenant Id](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/03_appRegistrationSecret.png)
 
-### Create Application User
+#### Application User - Create Application User
 Now, you have to create an [Application User](https://docs.microsoft.com/en-us/power-platform/admin/create-users-assign-online-security-roles#create-an-application-user) in Dynamics. This will be the user this extension uses to load and upload portal data.
 
 Make sure, you have the client id ready from the previous step.
@@ -90,7 +139,7 @@ To create this user, follow the guide on the official Microsoft documentation: [
 
 > **Important**: Don't forget to assign security role(s) to this application user.
 
-#### Security Roles: Required Entities
+#### Application User - Security Roles: Required Entities
 
 - READ: Website Languages (*adx_websitelanguages*)
 - READ: Portal Languages (*adx_portallanguages*)
@@ -202,6 +251,14 @@ Inactive records are now filtered out by default.
 
 **Bug Fixes**
 I fixed some of the old bugs but there will be new bugs. Sorry for that ;)
+
+### 0.3.1
+
+**Device Code Authentication**
+Addition of additional user authentication method called [Device Flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code). This authentication method allows a user to make changes in the context of their own user instead of an application user. 
+In addition, there is also significant less setup needed for this method.
+
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
 
 ## Credits
 Icons made by [Freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com

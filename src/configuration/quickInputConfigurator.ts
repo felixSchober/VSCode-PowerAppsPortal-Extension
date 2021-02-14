@@ -22,7 +22,11 @@ export interface ConfigurationState {
 	aadClientSecret: string;
 	aadTenantId: string;
 	useFoldersForFiles: boolean;
+	authenticationMethod: QuickPickItem | string;
 }
+
+export const QUICK_PICK_DEVICE_CODE_LABEL = 'User Authentication';
+export const QUICK_PICK_CLIENT_CREDENTIALS_LABEL = 'Application User';
 
 export async function multiStepInput(context: ExtensionContext): Promise<ConfigurationState>  {
 
@@ -39,8 +43,13 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		{label: 'crm11', description: 'UK'}
 	];
 
+	const authenticationMethods: QuickPickItem[] = [
+		{label: QUICK_PICK_DEVICE_CODE_LABEL, description: 'Device Code Flow', detail: 'Use this method if you want to authenticate with your own user account (recommended)'},
+		{label: QUICK_PICK_CLIENT_CREDENTIALS_LABEL, description: 'Client Credentials', detail: 'Use this method if you want to use a separate D365 Application User'}
+	];
+
 	const yesNo: QuickPickItem[] = [
-		{label: 'yes', description: 'new'},
+		{label: 'yes', description: '(recommended)'},
 		{label: 'no'}
 	];
 
@@ -63,7 +72,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.instanceName = await input.showInputBox({
 			title,
 			step: 1,
-			totalSteps: 6,
+			totalSteps: 7,
 			value: state.instanceName || '',
 			prompt: 'Provide the name of your instance. E.g. org7acas9gc if the url to your org is org7c98f08c.crm4.dynamics.com.' + CANCEL_MESSAGE,
 			validate: noValidation,
@@ -80,7 +89,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		const pick = await input.showQuickPick({
 			title,
 			step: 2,
-			totalSteps: 6,
+			totalSteps: 7,
 			placeholder: 'Select your portal region',
 			items: crmRegions,
 			activeItem: typeof state.crmRegion !== 'string' ? state.crmRegion : undefined,
@@ -95,7 +104,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.aadTenantId = await input.showInputBox({
 			title,
 			step: 3,
-			totalSteps: 6,
+			totalSteps: 7,
 			value: state.aadTenantId || '',
 			prompt: 'Provide the tenant Id of your AAD instance e.g. 10ea4d3e-1511-4461-9c6d-e21e73840528.' + CANCEL_MESSAGE,
 			validate: validateGuid,
@@ -114,7 +123,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		state.aadClientId = await input.showInputBox({
 			title,
 			step: 4,
-			totalSteps: 6,
+			totalSteps: 7,
 			value: state.aadClientId || '',
 			prompt: 'Provide the client Id of your AAD app registration e.g. 65f4ee4c-bbec-4059-b2ce-05e8e8acc679' + CANCEL_MESSAGE,
 			validate: validateGuid,
@@ -123,14 +132,34 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 		if(!state.aadClientId || state.aadTenantId === 'cancel') {
 			throw Error('canceled');
 		}
-		return (input: MultiStepInput) => inputClientSecret(input, state);
+		return (input: MultiStepInput) => pickAuthenticationMethod(input, state);
+	}
+
+	async function pickAuthenticationMethod(input: MultiStepInput, state: Partial<ConfigurationState>) {
+		const pick = await input.showQuickPick({
+			title,
+			step: 5,
+			totalSteps: 7,
+			placeholder: 'How do you want to connect?',
+			items: authenticationMethods,
+			activeItem: typeof state.authenticationMethod !== 'string' ? state.authenticationMethod : undefined,
+			shouldResume: shouldResume,
+		});
+		
+		state.authenticationMethod = pick;
+
+		if (pick.label === 'Application User') {
+			return (input: MultiStepInput) => inputClientSecret(input, state);
+		} else {
+			return (input: MultiStepInput) => inputUseFoldersForFiles(input, state);
+		}		
 	}
 
 	async function inputClientSecret(input:MultiStepInput, state: Partial<ConfigurationState>) {
 		state.aadClientSecret = await input.showInputBox({
 			title,
-			step: 5,
-			totalSteps: 6,
+			step: 6,
+			totalSteps: 7,
 			value: state.aadClientSecret || '',
 			prompt: 'Provide the client secret' + CANCEL_MESSAGE,
 			validate: noValidation,
@@ -147,8 +176,8 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 	async function inputUseFoldersForFiles(input:MultiStepInput, state: Partial<ConfigurationState>) {
 		const pick = await input.showQuickPick({
 			title,
-			step: 6,
-			totalSteps: 6,
+			step: 7,
+			totalSteps: 7,
 			items: yesNo,
 			placeholder: 'Do you want to organize web files in folders?',
 			validate: noValidation,
