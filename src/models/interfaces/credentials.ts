@@ -1,5 +1,5 @@
 export interface ICredentials {
 	clientId: string;
-	clientSecret: string;
+	secret: string;
 	aadTenantId: string;
 }

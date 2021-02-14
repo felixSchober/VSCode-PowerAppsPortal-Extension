@@ -1,6 +1,15 @@
 # Change Log
 
-## 0.2.0 
+## 0.3.1
+(Released: 14.02.2021)
+
+**Device Code Authentication**
+Addition of additional user authentication method called [Device Flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code). This authentication method allows a user to make changes in the context of their own user instead of an application user. 
+In addition, there is also significant less setup needed for this method.
+
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
+
+## 0.2.1 
 (Released: 10.02.2021)
 
 **Folder Mode for Web Files**: 

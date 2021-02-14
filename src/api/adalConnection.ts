@@ -1,9 +1,10 @@
-import { AuthenticationContext, ErrorResponse, TokenResponse } from 'adal-node';
+import { AuthenticationContext, ErrorResponse, TokenResponse, UserCodeInfo } from 'adal-node';
 import { OnTokenAcquiredCallback } from 'dynamics-web-api';
 import { ConfigurationManager } from '../configuration/configurationManager';
 import * as vscode from 'vscode';
+import { IXrmAuthenticationProvider } from '../models/interfaces/authenticationProvider';
 
-export class CrmAdalConnectionSettings {
+export class XrmAdalClientCredentialsAuthentication implements IXrmAuthenticationProvider {
 	instanceName: string;
 	resourceUrl: string;
 	crmRegion: string;
@@ -23,7 +24,7 @@ export class CrmAdalConnectionSettings {
 		this.instanceName = configurationManager.d365InstanceName || '';
 		this.crmRegion = configurationManager.d365CrmRegion || '';
 		this.aadClientId = credentials?.clientId || '';
-		this.aadClientSecret = credentials?.clientSecret || '';
+		this.aadClientSecret = credentials?.secret || '';
 		this.aadTenantId = credentials?.aadTenantId || '';
 		this.resourceUrl = `https://${this.instanceName}.${this.crmRegion}.dynamics.com`;
 		this.authenticated = false;
@@ -55,3 +56,6 @@ export class CrmAdalConnectionSettings {
 		console.log('[AUTH] Authentication prepared.');
 	}
 }
+
+
+
