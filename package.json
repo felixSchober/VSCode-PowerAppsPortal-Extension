@@ -18,7 +18,7 @@
 		"type": "git"
 	},
 	"engines": {
-		"vscode": "^1.50.0"
+		"vscode": "^1.53.0"
 	},
 	"categories": [
 		"SCM Providers",
@@ -183,11 +183,11 @@
 		"@types/keytar": "4.4.2",
 		"@types/mime-types": "^2.1.0",
 		"@types/mocha": "^8.2.0",
-		"@types/node": "^14.14.10",
+		"@types/node": "^14.14.28",
 		"@types/vscode": "^1.53.0",
 		"@typescript-eslint/eslint-plugin": "^4.9.0",
 		"@typescript-eslint/parser": "^4.15.0",
-		"eslint": "^7.19.0",
+		"eslint": "^7.20.0",
 		"glob": "^7.1.6",
 		"mocha": "^8.2.1",
 		"ts-loader": "^8.0.11",
@@ -200,7 +200,7 @@
 	"dependencies": {
 		"@azure/msal-common": "^4.0.0",
 		"@azure/msal-node": "^1.0.0-beta.6",
-		"adal-node": "^0.2.1",
+		"adal-node": "^0.2.2",
 		"dynamics-web-api": "^1.7.1",
 		"keytar": "^7.3.0",
 		"mime-types": "^2.1.27"
