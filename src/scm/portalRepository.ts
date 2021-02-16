@@ -437,11 +437,12 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 
 			case PortalFileType.contentSnippet:
 				const s = this.portalData?.getContentSnippet(uri);
+				const fileId = getFileIdFromUri(uri, PortalFileType.contentSnippet);
 				if (!s) {
 					throw Error('Could not find file in portal data with path ' + uri.fsPath);
 				}
 				await this.d365WebApi.deleteContentSnippet(s.id);
-				this.portalData?.data.webTemplate.delete(s.name);
+				this.portalData?.data.contentSnippet.delete(fileId);
 				break;
 
 			case PortalFileType.webFile:
@@ -580,7 +581,8 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 		}
 		switch (fileType) {
 			case PortalFileType.webTemplate:
-				const localNewTemplate: ID365WebTemplate = {
+			{
+					const localNewTemplate: ID365WebTemplate = {
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					_adx_websiteid_value: this.portalId,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -595,16 +597,28 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				this.portalData.data.webTemplate.set(remoteNewTemplate.name, remoteNewTemplate);
 				console.log(`\t[REPO] Template ${remoteNewTemplate.name} was added.`);
 				break;
+			}
 
 			case PortalFileType.contentSnippet:
-				const languageCode = this.portalData.getLanguageFromPath(uri);
+			{
+				const language = this.portalData.getLanguageObjectFromPath(uri);
+				let languageCode = '';
+				let languageId = '';
+				if (language) {
+					languageCode = language[1].adx_languagecode.toLocaleLowerCase();
+					languageId = language[0];
+				}
+
+				// create file name by removing the language from the path
+				const fileName = fileId.split('/').filter(s => s !== languageCode);
+				
 				const localNewSnippet: ID365ContentSnippet = {
 					// eslint-disable-next-line @typescript-eslint/naming-convention
-					adx_name: fileId,  // for contentSnippet: fileId = fileName
+					adx_name: fileName.join('/'),  // for contentSnippet: fileId = fileName
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					adx_value: newFileContent,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
-					_adx_contentsnippetlanguageid_value: languageCode,
+					_adx_contentsnippetlanguageid_value: languageId || '',
 					// eslint-disable-next-line @typescript-eslint/naming-convention
 					adx_contentsnippetid: undefined,
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -612,16 +626,18 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				};
 
 				const remoteNewSnippet = await this.d365WebApi.addContentSnippet(localNewSnippet);
-				this.portalData.data.contentSnippet.set(remoteNewSnippet.name, remoteNewSnippet);
+				this.portalData.data.contentSnippet.set(fileId, remoteNewSnippet);
 				console.log(`\t[REPO] Snippet ${remoteNewSnippet.name} was added.`);
 				break;
+			}
 
 			case PortalFileType.webFile:
+			{
 				if (!this.portalData.publishedStateId) {
 					console.warn('Could not upload file because published state id is not defined.');
 					this.portalData.publishedStateId = await this.d365WebApi.getPublishedPublishStateId(this.portalId);
 				}
-				const fileNameParts = fileId.split(path.sep);
+				const fileNameParts = fileId.split('/');
 				if (fileNameParts.length < 1) {
 					window.showErrorMessage(`The path of the file to be commited is not formatted correctly. Please try again or report the error. File Path: ${uri.fsPath}. File Id: ${fileId}`);
 					break;
@@ -647,6 +663,7 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
 				this.portalData.data.webFile.set(remoteNewFile.fileId, remoteNewFile);
 				console.log(`\t[REPO] File ${remoteNewFile.d365Note.filename} was updated.`);
 				break;
+			}
 
 			default:
 				break;

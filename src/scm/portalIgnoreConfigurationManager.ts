@@ -4,7 +4,8 @@ import { getFileExtension } from "../models/portalData";
 export class PortalIgnoreConfigurationManager {
 
 	private fileExtIgnoreList = [
-		'ds_store'
+		'ds_store',
+		'git'
 	];
 
 	isIgnored(uri: Uri): boolean {

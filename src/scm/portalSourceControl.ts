@@ -24,7 +24,7 @@ import {
 	FOLDER_WEB_FILES,
 	PowerAppsPortalRepository,
 } from './portalRepository';
-import { getFileIdFromUri, getFileName, getFileType, PortalData, PortalFileType } from '../models/portalData';
+import { getFileName, getFileType, PortalData, PortalFileType } from '../models/portalData';
 import { Utils } from '../utils';
 import path = require('path');
 import { ALL_FILES_GLOB } from './afs';
