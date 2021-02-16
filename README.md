@@ -1,4 +1,5 @@
 # PowerApps Portals Local Source Control
+![Build & Deploy](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/workflows/Build%20&%20Deploy/badge.svg?branch=master) [![VS Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/FelixSchober.powerapps-portal-local-development.svg)](https://marketplace.visualstudio.com/items?itemName=FelixSchober.powerapps-portal-local-development)
 
 Currently, there is only one way to edit code for [Power Apps portals](https://powerapps.microsoft.com/en-us/portals/) which is using the Dynamics solution and the somewhat limited online editor.
 
@@ -91,7 +92,7 @@ Open the command prompt in VSCode (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</k
 
 After the initial setup the extension will prompt you to copy a code and click on Ok to open the browser
 
-![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif) 
 
 
 Congratulations! The setup is finished.
