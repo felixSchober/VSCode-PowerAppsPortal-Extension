@@ -121,11 +121,11 @@ export class PortalData {
 		return parentWebPage;
 	}
 
-	public getLanguageFromPath(uri: Uri): string {
+	public getLanguageObjectFromPath(uri: Uri): [string, ID365PortalLanguage] | undefined {
 		// return language id based on the path
 
 		if (this.languages.size === 0) {
-			throw Error('Could not get language from path because languages are not defined.');
+			throw Error('Could not get language from path because languages are not defined. Try to restart vscode.');
 		}
 		const filePathComponents = uri.fsPath.split(path.sep);
 		// find something like en-us in the path
@@ -133,12 +133,12 @@ export class PortalData {
 			const foundCodeInPath = filePathComponents.includes(languageObj.adx_languagecode.toLocaleLowerCase());
 			if (foundCodeInPath) {
 				console.log(`[PORTAL DATA] Detected language ${languageObj.adx_displayname} for path ${uri.fsPath}`);
-				return languageId;
+				return [languageId, languageObj];
 			}
 		}
 
 		// return default, which is language not specified
-		return '';
+		return undefined;
 	}
 }
 

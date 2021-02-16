@@ -1,5 +1,21 @@
 # Change Log
 
+## 0.3.2
+(Released: 16.02.2021)
+
+**Content Snippets Bug Fixes**
+When adding a new content snippet the extension used to include the language code into the name of the content snippet. This is now fixed.
+
+**Content Snippet Delete from Extension**
+When deleting a content snippet in the extension the SCM window was not updated to show it as deleted.
+
+**Added .git to portal ignore manager**
+When using the extension in combination with a git repository, sometimes .git files would show up.
+
+**Creating web files**
+When creating new web files it used to take the path prefix as the partial web file URL. This has been fixed.
+
+
 ## 0.3.1
 (Released: 14.02.2021)
 
