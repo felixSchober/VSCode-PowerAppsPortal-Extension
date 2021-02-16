@@ -141,15 +141,16 @@ To create this user, follow the guide on the official Microsoft documentation: [
 
 #### Application User - Security Roles: Required Entities
 
-- READ: Website Languages (*adx_websitelanguages*)
-- READ: Portal Languages (*adx_portallanguages*)
-- READ: Websites (*adx_websites*)
-- READ: Web Pages (*adx_webpages*)
-- READ: Publishing States (*adx_publishingstates*)
-- FULL: Content Snippets (*adx_contentsnippets*)
-- FULL: Web Templates (*adx_webtemplates*)
-- FULL: Annotations (*annotations*)
-- FULL: Web Files (*adx_webfiles*)
+- READ: Website Languages (`adx_websitelanguage`)
+- READ: Portal Languages (`adx_portallanguage`)
+- READ: Websites (`adx_website`)
+- READ: Web Pages (`adx_webpage`)
+- READ: Publishing States (`adx_publishingstate`)
+- READ: Page Templates (`adx_pagetemplate`)
+- FULL: Content Snippets (`adx_contentsnippet`)
+- FULL: Web Templates (`adx_webtemplate`)
+- FULL: Annotations (`annotation`)
+- FULL: Web Files (`adx_webfile`)
 
 
 ## Configuration
