@@ -7,10 +7,14 @@ on:
       - master
     paths-ignore: # dont run when changes made to these folders 
       - '.vscode/**'
+      - '.github/**'
+      - 'GitVersion.yml'
+      - '.eslintrc.json'
+      - 'test/**'
     
 jobs:
   cicd:
-    name: cicd
+    name: CI/CD
     runs-on: windows-latest
     steps:
       - name: checkout repo
