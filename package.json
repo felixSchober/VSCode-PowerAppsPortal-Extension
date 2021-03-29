@@ -202,7 +202,7 @@
 		"@azure/msal-node": "^1.0.0-beta.6",
 		"adal-node": "^0.2.2",
 		"dynamics-web-api": "^1.7.1",
-		"keytar": "^7.3.0",
+		"keytar": "^7.6.0",
 		"mime-types": "^2.1.27"
 	}
 }
