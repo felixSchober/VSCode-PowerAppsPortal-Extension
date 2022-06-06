@@ -37,7 +37,7 @@ jobs:
           echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
 
       - name: setup node
-        uses: actions/setup-node@v2.1.4
+        uses: actions/setup-node@v3.3.0
         with:
           node-version: '12.x'
         
