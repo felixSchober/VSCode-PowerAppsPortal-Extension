@@ -1,6 +1,8 @@
-import { ICredentials } from "../models/interfaces/credentials";
 import * as keytarType from 'keytar';
 import { env } from 'vscode';
+
+import { ICredentials } from "../models/interfaces/credentials";
+
 import { AuthenticationMethod } from "./configurationManager";
 
 const keytar = getNodeModule<typeof keytarType>('keytar');

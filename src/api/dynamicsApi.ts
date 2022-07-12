@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-var dynamicsWebApi = require('dynamics-web-api');
 import { CreateRequest, DeleteRequest, RetrieveMultipleRequest, UpdateRequest } from 'dynamics-web-api';
+
 import { AuthenticationMethod, ConfigurationManager } from '../configuration/configurationManager';
 import { ContentSnippet } from '../models/ContentSnippet';
+import { WebFile } from '../models/WebFile';
+import { WebTemplate } from '../models/WebTemplate';
 import { IXrmAuthenticationProvider } from '../models/interfaces/authenticationProvider';
 import { CONTENTSNIPPET_SELECT, ID365ContentSnippet } from '../models/interfaces/d365ContentSnippet';
 import { ID365PortalLanguage, ID365WebsiteLanguage } from '../models/interfaces/d365Language';
@@ -10,15 +12,16 @@ import { ID365Note, NOTE_SELECT } from '../models/interfaces/d365Note';
 import { ID365PageTemplate, PAGETEMPLATE_SELECT } from '../models/interfaces/d365PageTemplate';
 import { ID365PublishingState } from '../models/interfaces/d365PublishingState';
 import { ID365WebFile } from '../models/interfaces/d365WebFile';
+import { ID365WebTemplate, WEBTEMPLATE_SELECT } from '../models/interfaces/d365WebTemplate';
 import { ID365Webpage, WEBPAGE_SELECT } from '../models/interfaces/d365Webpage';
 import { ID365Website } from '../models/interfaces/d365Website';
-import { ID365WebTemplate, WEBTEMPLATE_SELECT } from '../models/interfaces/d365WebTemplate';
-import { WebFile } from '../models/WebFile';
 import { WebPage } from '../models/webPage';
-import { WebTemplate } from '../models/WebTemplate';
+
 import { XrmAdalClientCredentialsAuthentication } from './adalConnection';
 import { XrmAdalDeviceCredentialsAuthentication } from './adalDeviceAuthentication';
 import { MsalConnection } from './msalConnection';
+
+var dynamicsWebApi = require('dynamics-web-api');
 
 export class DynamicsApi {
 	private webApi: DynamicsWebApi;
