@@ -54,7 +54,7 @@ jobs:
           files: '${{github.workspace}}/package.json'
           patch-syntax: |
             = /version => "${{ steps.gitversion.outputs.semVer }}"
-            = /displayName => "PowerApps Portal Local Development"
+            = /displayName => "Power Pages Local Development"
             = /description => "Local source control for Power Apps portals code for web files like images or style sheets, web templates and content snippets."
       
       - name: add version in CHANGELOG.md

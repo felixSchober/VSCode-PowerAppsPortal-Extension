@@ -38,7 +38,7 @@ export class XrmAdalClientCredentialsAuthentication implements IXrmAuthenticatio
 			if (error) {
 				const errorMessage = `Could not authenticate with provided credentials. \nError Details:\n\tMessage: ${error.message}\n\tStack: ${error.stack}`;
 				console.error('[AUTH] ' + errorMessage);
-				vscode.window.showErrorMessage(`Could not authenticate with provided credentials. To configure the extension again, issue the command '>PowerApps Portals: Configure'. \nError Details:\n\tMessage: ${error.message}`);
+				vscode.window.showErrorMessage(`Could not authenticate with provided credentials. To configure the extension again, issue the command '>Power Pages: Configure'. \nError Details:\n\tMessage: ${error.message}`);
 			}
 
 			// authentication successful
