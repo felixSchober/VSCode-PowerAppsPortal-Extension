@@ -1,7 +1,7 @@
 {
 	"name": "powerapps-portal-local-development",
-	"displayName": "PowerApps Portal Local Development",
-	"description": "Local source control of power apps portals code including web files like images or style sheets, web templates and content snippets.",
+	"displayName": "Power Pages Local Development",
+	"description": "Local source control of Power Pages code including web files like images or style sheets, web templates and content snippets.",
 	"version": "0.3.2",
 	"icon": "resources/icons/icon.png",
 	"homepage": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
@@ -30,6 +30,9 @@
 	},
 	"keywords": [
 		"Power Apps Portals",
+		"Power Pages",
+		"PowerPages",
+		"Dataverse",
 		"Dynamics",
 		"PowerApps Portal",
 		"Liquid",
@@ -45,27 +48,27 @@
 		"commands": [
 			{
 				"command": "powerapps-portal-local-development.source-control.commit",
-				"title": "PowerApps Portals: Commit local changes to Portal",
+				"title": "Power Pages: Commit local changes to Portal",
 				"icon": "$(cloud-upload)"
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.refresh",
-				"title": "PowerApps Portals: Refresh Portal data",
+				"title": "Power Pages: Refresh Portal data",
 				"icon": "$(cloud-download)"
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.discard",
-				"title": "PowerApps Portals: Discard local changes",
+				"title": "Power Pages: Discard local changes",
 				"icon": "$(discard)"
 			},
 			{
 				"command": "powerapps-portal-local-development.configureExtension",
-				"title": "PowerApps Portals: Configure"
+				"title": "Power Pagess: Configure"
 			}
 		],
 		"configuration": {
 			"type": "object",
-			"title": "PowerApps Portal Configuration",
+			"title": "Power Pages Configuration",
 			"properties": {
 				"powerappsPortals.aadTenantId": {
 					"type": "string",
