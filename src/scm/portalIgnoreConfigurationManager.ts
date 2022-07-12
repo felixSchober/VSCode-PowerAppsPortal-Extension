@@ -1,4 +1,5 @@
 import { Uri } from "vscode";
+
 import { getFileExtension } from "../models/portalData";
 
 export class PortalIgnoreConfigurationManager {

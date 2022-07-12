@@ -1,10 +1,13 @@
+import path = require('path');
+
 import { Uri } from 'vscode';
+
 import { BASE64 } from '../scm/afs';
+import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from '../scm/portalRepository';
+
 import { ContentSnippet } from './ContentSnippet';
 import { WebFile } from './WebFile';
 import { WebTemplate } from './WebTemplate';
-import path = require('path');
-import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from '../scm/portalRepository';
 import { ID365PortalLanguage } from './interfaces/d365Language';
 import { WebPage } from './webPage';
 

@@ -1,3 +1,5 @@
+import * as path from 'path';
+
 import {
 	CancellationToken,
 	Disposable,
@@ -8,8 +10,9 @@ import {
 	Uri,
 	WorkspaceFolder,
 } from 'vscode';
+
 import { PortalData } from '../models/portalData';
-import * as path from 'path';
+
 import { FOLDER_CONTENT_SNIPPETS, FOLDER_TEMPLATES, FOLDER_WEB_FILES } from './portalRepository';
 
 export class PowerAppsPortalDocumentContentProvider implements TextDocumentContentProvider, Disposable {

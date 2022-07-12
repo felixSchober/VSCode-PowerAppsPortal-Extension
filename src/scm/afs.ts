@@ -1,8 +1,9 @@
 // This file promisifies necessary file system functions.
 // This should be removed when VS Code updates to Node.js ^11.14 and replaced by the native fs promises.
 
-import * as vscode from 'vscode';
 import * as fs from 'fs';
+
+import * as vscode from 'vscode';
 export const UTF8 = 'utf8';
 export const BASE64 = 'base64';
 export const ALL_FILES_GLOB = '**/*.*';
