@@ -1,5 +1,6 @@
-import { PowerAppsPortalSourceControl } from "./portalSourceControl";
 import * as vscode from 'vscode';
+
+import { PowerAppsPortalSourceControl } from "./portalSourceControl";
 
 export class RepositoryPick implements vscode.QuickPickItem {
 

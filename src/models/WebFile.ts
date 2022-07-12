@@ -1,6 +1,7 @@
+import * as mime from 'mime-types';
+
 import { ID365Note } from "./interfaces/d365Note";
 import { ID365WebFile } from "./interfaces/d365WebFile";
-import * as mime from 'mime-types';
 import { IPortalDataDocument } from "./interfaces/dataDocument";
 import { WebPage } from "./webPage";
 

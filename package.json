@@ -63,7 +63,7 @@
 			},
 			{
 				"command": "powerapps-portal-local-development.configureExtension",
-				"title": "Power Pagess: Configure"
+				"title": "Power Pages: Configure"
 			}
 		],
 		"configuration": {
@@ -170,14 +170,13 @@
 		}
 	},
 	"scripts": {
+		"build": "webpack --mode development",
+		"build-and-lint": "npm run build && npm run lint",
+		"build-debug": "npm run build debug",
+		"build-edge-watch": "webpack --env debug --env devtoolsBaseUri=http://localhost:3000/vscode_app.html",
+		"build-watch": "npm run build && npm run watch",
+		"lint": "eslint . --ext .ts --fix",
 		"vscode:prepublish": "webpack --mode production",
-		"webpack": "webpack --mode development",
-		"webpack-dev": "webpack --mode development --watch",
-		"test-compile": "tsc -p ./",
-		"compile": "tsc -p ./",
-		"lint": "eslint src --ext ts",
-		"watch": "tsc -watch -p ./",
-		"pretest": "npm run compile && npm run lint",
 		"package": "vsce package",
 		"deploy": "vsce publish -p"
 	},
@@ -188,9 +187,19 @@
 		"@types/mocha": "^8.2.3",
 		"@types/node": "^14.18.21",
 		"@types/vscode": "^1.69.0",
-		"@typescript-eslint/eslint-plugin": "^4.33.0",
-		"@typescript-eslint/parser": "^4.33.0",
-		"eslint": "^7.32.0",
+		"@typescript-eslint/eslint-plugin": "^5.9.1",
+		"@typescript-eslint/parser": "^5.9.1",
+		"eslint": "^8.6.0",
+		"eslint-config-prettier": "^6.15.0",
+		"eslint-plugin-import": "^2.22.1",
+		"eslint-plugin-jsdoc": "^38.0.7",
+		"eslint-plugin-node": "^11.1.0",
+		"eslint-plugin-prefer-arrow": "^1.2.3",
+		"eslint-plugin-security": "^1.4.0",
+		"husky": "^4.3.0",
+		"lint-staged": "^10.4.0",
+		"prettier": "^2.4.1",
+		"prettier-package-json": "^2.6.0",
 		"glob": "^7.2.3",
 		"mocha": "^8.4.0",
 		"ts-loader": "^8.4.0",
@@ -207,5 +216,14 @@
 		"dynamics-web-api": "^1.7.5",
 		"keytar": "^7.9.0",
 		"mime-types": "^2.1.35"
+	},
+	"lint-staged": {
+		"*.{ts}": [
+			"prettier --write",
+			"eslint --fix"
+		],
+		"{,**/}*.json": [
+			"prettier-package-json --tab-width 4 --write"
+		]
 	}
 }
