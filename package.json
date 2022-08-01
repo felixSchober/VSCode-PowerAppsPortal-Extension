@@ -1,7 +1,7 @@
 {
 	"name": "powerapps-portal-local-development",
-	"displayName": "Power Pages Local Development",
-	"description": "Local source control of Power Pages code including web files like images or style sheets, web templates and content snippets.",
+	"displayName": "PowerApps Portal Local Development",
+	"description": "Local source control of power apps portals code including web files like images or style sheets, web templates and content snippets.",
 	"version": "0.4.0",
 	"icon": "resources/icons/icon.png",
 	"homepage": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
@@ -45,30 +45,29 @@
 	],
 	"main": "./dist/extension",
 	"contributes": {
-		"commands": [
-			{
+		"commands": [{
 				"command": "powerapps-portal-local-development.source-control.commit",
-				"title": "Power Pages: Commit local changes to Portal",
+				"title": "PowerApps Portals: Commit local changes to Portal",
 				"icon": "$(cloud-upload)"
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.refresh",
-				"title": "Power Pages: Refresh Portal data",
+				"title": "PowerApps Portals: Refresh Portal data",
 				"icon": "$(cloud-download)"
 			},
 			{
 				"command": "powerapps-portal-local-development.source-control.discard",
-				"title": "Power Pages: Discard local changes",
+				"title": "PowerApps Portals: Discard local changes",
 				"icon": "$(discard)"
 			},
 			{
 				"command": "powerapps-portal-local-development.configureExtension",
-				"title": "Power Pages: Configure"
+				"title": "PowerApps Portals: Configure"
 			}
 		],
 		"configuration": {
 			"type": "object",
-			"title": "Power Pages Configuration",
+			"title": "PowerApps Portal Configuration",
 			"properties": {
 				"powerappsPortals.aadTenantId": {
 					"type": "string",
@@ -150,8 +149,7 @@
 			}
 		},
 		"menus": {
-			"scm/title": [
-				{
+			"scm/title": [{
 					"command": "powerapps-portal-local-development.source-control.commit",
 					"group": "navigation",
 					"when": "scmProvider == powerappsPortal"

@@ -193,7 +193,7 @@ async function initializeFolderFromConfiguration(
     } catch (error) {
         void DialogReporter.reportError(
             error,
-            "Could not load configuration. Please try running the command >Power Pages: Configure again."
+            "Could not load configuration. Please try running the command >PowerApps Portals: Configure again."
         );
         return;
     }
@@ -207,7 +207,7 @@ async function initializeFolderFromConfiguration(
         console.log("[START] Could not load config. Manual config required.");
         void DialogReporter.reportError(
             "",
-            "Could not load configuration from .portal file. Please try to restart VSCode and run the command >Power Pages: Configure again.",
+            "Could not load configuration from .portal file. Please try to restart VSCode and run the command >PowerApps Portals: Configure again.",
             false
         );
         return;
