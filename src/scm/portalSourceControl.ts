@@ -49,7 +49,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
     constructor(context: ExtensionContext, private readonly workspaceFolder: WorkspaceFolder, configurationManager: ConfigurationManager) {
         this.portalScm = scm.createSourceControl(
             "powerappsPortal",
-            "Power Pages " + configurationManager.d365InstanceName,
+            "PowerApps Portal " + configurationManager.d365InstanceName,
             workspaceFolder.uri
         );
         this.changedResources = this.portalScm.createResourceGroup("workingTree", "Changes");

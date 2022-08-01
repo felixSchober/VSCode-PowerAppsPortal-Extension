@@ -1,5 +1,4 @@
-# Power Pages Local Source Control
-
+# PowerApps Portals Local Source Control
 ![Build & Deploy](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/workflows/Build%20&%20Deploy/badge.svg?branch=master) [![VS Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/FelixSchober.powerapps-portal-local-development.svg)](https://marketplace.visualstudio.com/items?itemName=FelixSchober.powerapps-portal-local-development)
 
 Currently, there is only one way to edit code for [Power Apps portals](https://powerapps.microsoft.com/en-us/portals/) which is using the Dynamics solution and the somewhat limited online editor.
@@ -53,7 +52,7 @@ Within the source control pane, you can click discard to discard all your local 
 
 Go to the [VSCode Marketplace page of the extension](https://marketplace.visualstudio.com/items?itemName=FelixSchober.powerapps-portal-local-development) and install the extension.
 
-After installing, open the command prompt (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>Power Pages: Configure`. Follow the setup instructions below and choose your authentication method.
+After installing, open the command prompt (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>PowerApps Portals: Configure`. Follow the setup instructions below and choose your authentication method.
 
 ### Authentication
 There are two methods you can use to connect this extension with your CDS/Dynamics instance.
@@ -87,7 +86,7 @@ To setup an app registration, just follow these steps:
 
 #### User Account - Extension Setup
 
-Open the command prompt in VSCode (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>Power Pages: Configure`
+Open the command prompt in VSCode (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>PowerApps Portals: Configure`
 
 ![Extension Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_1.gif)
 
@@ -157,7 +156,7 @@ To create this user, follow the guide on the official Microsoft documentation: [
 
 ## Configuration
 
-To start using this application, issue the command >Power Pages Configure
+To start using this application, issue the command >PowerApps Portals Configure
 
 ![Configuration Steps Example](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configuration.gif)
 
