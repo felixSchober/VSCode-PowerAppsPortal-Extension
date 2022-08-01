@@ -25,7 +25,6 @@ import { DEFAULT_MIME_TYPE, WebFile } from "../models/WebFile";
 import { IPortalDataDocument } from "../models/interfaces/dataDocument";
 import { getFileName, getFileType, PortalData, PortalFileType } from "../models/portalData";
 import { DialogReporter } from "../telemetry/DialogReporter";
-import { Utils } from "../utils";
 
 import * as afs from "./afs";
 import { ALL_FILES_GLOB } from "./afs";
@@ -180,7 +179,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
     }
 
     private async prepareCommitToRepository() {
-        return await window.withProgress({ location: ProgressLocation.SourceControl }, async (progress, cancellationToken) => {
+        return await window.withProgress({ location: ProgressLocation.SourceControl }, async () => {
             for (const changedResource of this.changedResourceStates.values()) {
                 const fileType = getFileType(changedResource.resourceUri);
                 // was deleted?
@@ -219,9 +218,9 @@ export class PowerAppsPortalSourceControl implements Disposable {
      */
     async resetFilesToCheckedOutVersion(): Promise<void> {
         // create folder structure
-        await Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_CONTENT_SNIPPETS));
-        await Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES));
-        await Utils.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES));
+        await afs.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_CONTENT_SNIPPETS));
+        await afs.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES));
+        await afs.createFolder(path.join(this.workspaceFolder.uri.fsPath, FOLDER_TEMPLATES));
 
         for (const snippet of this.portalData.data.contentSnippet.entries()) {
             await this.resetFile(snippet[0], PortalFileType.contentSnippet, snippet[1]);
@@ -248,7 +247,7 @@ export class PowerAppsPortalSourceControl implements Disposable {
                 try {
                     await afs.unlink(f.resourceUri.fsPath);
                 } catch (error) {
-                    console.warn(`Could not delete file ${f.resourceUri.fsPath}. Error: ${error}`);
+                    console.warn(`[SCM] Could not delete file ${f.resourceUri.fsPath}. Error: ${error}`);
                 }
             }
         }
@@ -275,14 +274,19 @@ export class PowerAppsPortalSourceControl implements Disposable {
                 break;
 
             case PortalFileType.webFile:
-                const f = <WebFile>portalDocument;
-                fileContent = this.portalData.data.webFile.get(f.fileId)?.b64Content || "";
+                fileContent = this.getWebFileContents(portalDocument);
                 await afs.writeBase64File(filePath, fileContent);
                 break;
 
             default:
                 break;
         }
+    }
+
+    private getWebFileContents(portalDocument: IPortalDataDocument): string {
+        const f = <WebFile>portalDocument;
+        const fileContent = this.portalData.data.webFile.get(f.fileId)?.b64Content || "";
+        return fileContent;
     }
 
     async tryCheckout(): Promise<void> {
@@ -513,28 +517,30 @@ export class PowerAppsPortalSourceControl implements Disposable {
     }
 
     /** Determines whether the resource is different, regardless of line endings. */
-    isDirty(doc: TextDocument): boolean {
-        const originalText = this.portalData.getDocumentContent(doc.uri) || "";
-        // if (!originalText) {
-        // 	return true;
-        // }
-        const isDirty = originalText.replace(/\n/g, "").replace(/\r/g, "") !== doc.getText().replace(/\n/g, "").replace(/\r/g, "");
+    isDirty(localDoc: TextDocument): boolean {
+        const remoteText = this.portalData.getDocumentContent(localDoc.uri, true) || "";
+        const localText = localDoc.getText();
+        const isDirty = this.removeLineCharacters(remoteText) !== this.removeLineCharacters(localText);
 
         if (isDirty) {
-            console.log(`[SCM]\t${doc.fileName} is dirty`);
+            console.log(`[SCM]\t${localDoc.fileName} is dirty`);
         }
         return isDirty;
     }
 
+    /**
+     * Removes `\r` and `\n` from the given string.
+     */
+    private removeLineCharacters(text: string): string {
+        return text.replace(/\n/g, "").replace(/\r/g, "");
+    }
+
     isDirtyBase64(originalDocUri: Uri, doc: string): boolean {
-        const originalText = this.portalData.getDocumentContent(originalDocUri, true) || "";
-        // if (!originalText) {
-        // 	return true;
-        // }
+        const originalText = this.portalData.getDocumentContent(originalDocUri, false) || "";
         const isDirty = originalText !== doc;
 
         if (isDirty) {
-            console.log(`[SCM]\t${originalDocUri.fsPath} is dirty`);
+            console.log(`[SCM]\t${originalDocUri.fsPath} is dirty (base64)`);
         }
 
         return isDirty;
