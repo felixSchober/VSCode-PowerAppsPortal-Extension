@@ -1,6 +1,5 @@
-import { AuthenticationContext, ErrorResponse, TokenResponse, UserCodeInfo } from "adal-node";
+import { AuthenticationContext, ErrorResponse, TokenResponse } from "adal-node";
 import { OnTokenAcquiredCallback } from "dynamics-web-api";
-import * as vscode from "vscode";
 
 import { ConfigurationManager } from "../configuration/configurationManager";
 import { IXrmAuthenticationProvider } from "../models/interfaces/authenticationProvider";

@@ -1,5 +1,4 @@
 import fs = require('fs');
-import path = require('path');
 
 export class Utils {
 	static readFileAsync(filepath: string): Promise<Buffer> {
@@ -38,20 +37,6 @@ export class Utils {
 			}
 		});
 	}
-
-	// static findFilesForPath(pathname: string): string[] {
-	// 	// check if path exists
-	// 	if (!fs.existsSync(pathname)) {
-	// 		throw Error('Could not find path ' + pathname);
-	// 	}
-
-	// 	const fullPaths: string[] = tl.ls('-A', [pathname]);
-	// 	const baseNames: string[] = [];
-	// 	for (let i = 0; i < fullPaths.length; i++) {
-	// 		baseNames[i] = path.basename(fullPaths[i]);
-	// 	}
-	// 	return baseNames;
-	// }
 
 	static toLookup<T>(input: Array<T>, keyLookupParameter: (type: T) => string): { [id: string]: T } {
 		const result: { [id: string]: T } = {};

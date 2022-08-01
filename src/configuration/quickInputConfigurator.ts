@@ -3,8 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { utils } from "mocha";
-import { QuickPickItem, window, Disposable, QuickInputButton, QuickInput, ExtensionContext, QuickInputButtons } from "vscode";
+import { QuickPickItem, window, Disposable, QuickInputButton, QuickInput, QuickInputButtons } from "vscode";
 
 import { Utils } from "../utils";
 
@@ -21,7 +20,7 @@ export interface ConfigurationState {
 export const QUICK_PICK_DEVICE_CODE_LABEL = "User Authentication";
 export const QUICK_PICK_CLIENT_CREDENTIALS_LABEL = "Application User";
 
-export async function multiStepInput(context: ExtensionContext): Promise<ConfigurationState> {
+export async function multiStepInput(): Promise<ConfigurationState> {
     const crmRegions: QuickPickItem[] = [
         { label: "crm", description: "North America" },
         { label: "crm2", description: "South America" },
@@ -187,7 +186,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
 
     function shouldResume() {
         // Could show a notification with the option to resume.
-        return new Promise<boolean>((resolve, reject) => {
+        return new Promise<boolean>(resolve => {
             resolve(true);
         });
     }
@@ -196,7 +195,7 @@ export async function multiStepInput(context: ExtensionContext): Promise<Configu
         return !Utils.isGuid(name) ? Promise.resolve("Guid not valid") : Promise.resolve(undefined);
     }
 
-    function noValidation(name: string): Promise<string | undefined> {
+    function noValidation(): Promise<string | undefined> {
         return Promise.resolve(undefined);
     }
 
@@ -239,7 +238,7 @@ interface InputBoxParameters {
 }
 
 class MultiStepInput {
-    static async run<T>(start: InputStep) {
+    static async run(start: InputStep) {
         const input = new MultiStepInput();
         return input.stepThrough(start);
     }
@@ -247,7 +246,7 @@ class MultiStepInput {
     private current?: QuickInput;
     private steps: InputStep[] = [];
 
-    private async stepThrough<T>(start: InputStep) {
+    private async stepThrough(start: InputStep) {
         let step: InputStep | void = start;
         while (step) {
             this.steps.push(step);
