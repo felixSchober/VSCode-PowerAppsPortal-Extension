@@ -304,8 +304,10 @@ Checklist:
 - [ ] Update package version
 - [ ] Update readme.md changelog
 - [ ] Update CHANGELOG.md
-- [ ] Tag the release commit with the version number (`git tag -l "vX.Y.Z"`)
-
+- [ ] Tag the release commit with the version number (`git tag -a vX.Y.Z -m "Describe release X.Y.Z (e.g. August 2022 release)"`)
+- [ ] Verify the tag was created with `git tag`
+- [ ] Push the tag to origin (if not already part of a push) (`git push origin --tags`)
+- [ ] Create a PR to merge develop to main.
 
 ## Credits
 
