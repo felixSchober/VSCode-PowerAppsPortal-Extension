@@ -2,7 +2,7 @@
 	"name": "powerapps-portal-local-development",
 	"displayName": "PowerApps Portal Local Development",
 	"description": "Local source control of power apps portals code including web files like images or style sheets, web templates and content snippets.",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"icon": "resources/icons/icon.png",
 	"homepage": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension",
 	"bugs": "https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/issues",
@@ -18,7 +18,7 @@
 		"type": "git"
 	},
 	"engines": {
-		"vscode": "^1.53.0"
+		"vscode": "^1.69.0"
 	},
 	"categories": [
 		"SCM Providers",
@@ -45,7 +45,8 @@
 	],
 	"main": "./dist/extension",
 	"contributes": {
-		"commands": [{
+		"commands": [
+			{
 				"command": "powerapps-portal-local-development.source-control.commit",
 				"title": "PowerApps Portals: Commit local changes to Portal",
 				"icon": "$(cloud-upload)"
@@ -149,7 +150,8 @@
 			}
 		},
 		"menus": {
-			"scm/title": [{
+			"scm/title": [
+				{
 					"command": "powerapps-portal-local-development.source-control.commit",
 					"group": "navigation",
 					"when": "scmProvider == powerappsPortal"

@@ -284,6 +284,29 @@ CSS files that have been created by a template are encoded with UTF-16LE vs. UTF
 When uploading new webfiles under the root web page the extension tried to find a parent 'home' page. When multiple pages without a parent page are found this can lead to issues.
 The extension now searches for pages that both have no parent page and are also a root page.
 
+### 0.4.1
+
+**vscode engine upgrade** vscode engine was upgraded to vscode 1.69.0.
+
+## Contributing
+
+- Clone repo and open in VS Code
+- Run `npm install`
+- Run the extension locally with "Run and Debug" -> "Launch Extension"
+- Commit your changes to a user or feature branch
+- Merge to dev branch with PR
+
+### Release
+
+Checklist:
+
+- [ ] Check if there are any breaking changes
+- [ ] Update package version
+- [ ] Update readme.md changelog
+- [ ] Update CHANGELOG.md
+- [ ] Tag the release commit with the version number (`git tag -l "vX.Y.Z"`)
+
+
 ## Credits
 
 Icons made by [Freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
