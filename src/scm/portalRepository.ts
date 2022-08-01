@@ -57,7 +57,10 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
         this.isDownloadCanceled = false;
     }
 
-    provideOriginalResource(uri: Uri, token: CancellationToken | null): ProviderResult<Uri> {
+    provideOriginalResource(uri: Uri, cancellationToken: CancellationToken | null): ProviderResult<Uri> {
+        if (cancellationToken && cancellationToken.isCancellationRequested) {
+            return null;
+        }
         const relativePath = workspace.asRelativePath(uri.fsPath);
         return Uri.parse(`${POWERAPPSPORTAL_SCHEME}:${relativePath}`);
     }
@@ -117,47 +120,15 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
      * @param fileName file part, which is also used as a file extension
      * @returns path of the locally cloned fiddle resource ending with the given extension
      */
-    async createLocalResourcePath(fileName: string, fileType: PortalFileType, portalDataFile?: IPortalDataDocument) {
+    async createLocalResourcePath(fileName: string, fileType: PortalFileType, portalDataFile?: IPortalDataDocument): Promise<string> {
         fileName = fileName.toLowerCase();
         let fileTypePath = "";
         switch (fileType) {
             case PortalFileType.contentSnippet:
-                const filePath = fileName.split("/");
-                fileName = filePath.pop() || fileName;
-                // fileName = fileName.replace('/', '_');
-                fileTypePath = FOLDER_CONTENT_SNIPPETS;
-                const snippetPath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, ...filePath);
-                try {
-                    await createFolder(snippetPath);
-                } catch (error) {
-                    console.error(`Could not create folder ${snippetPath}`);
-                    throw Error(`Could not create folder ${snippetPath}`);
-                }
-                return path.join(snippetPath, fileName + ".html");
+                return this.createLocalContentSnippetPath(fileName);
 
             case PortalFileType.webFile:
-                fileTypePath = FOLDER_WEB_FILES;
-
-                // should we create folders?
-                if (this.configurationManager.useFoldersForWebFiles) {
-                    // get actual file
-                    const webFile = <WebFile>portalDataFile;
-
-                    if (webFile) {
-                        const webFilePath = path.join(this.workspaceFolder.uri.fsPath, fileTypePath, webFile.filePath);
-
-                        try {
-                            await createFolder(webFilePath);
-                        } catch (error) {
-                            console.error(`Could not create folder ${webFilePath}`);
-                            throw Error(`Could not create folder ${webFilePath}`);
-                        }
-
-                        return path.join(webFilePath, fileName);
-                    }
-                }
-
-                return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName);
+                return this.createLocalWebFilePath(fileName, portalDataFile as WebFile);
 
             case PortalFileType.webTemplate:
                 fileTypePath = FOLDER_TEMPLATES;
@@ -167,6 +138,37 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
                 break;
         }
         return path.join(this.workspaceFolder.uri.fsPath, fileTypePath, fileName + ".html");
+    }
+
+    private async createLocalContentSnippetPath(fileName: string): Promise<string> {
+        const filePath = fileName.split("/");
+        fileName = filePath.pop() || fileName;
+        const snippetPath = path.join(this.workspaceFolder.uri.fsPath, FOLDER_CONTENT_SNIPPETS, ...filePath);
+        try {
+            await createFolder(snippetPath);
+        } catch (error) {
+            console.error(`Could not create folder ${snippetPath}`);
+            throw Error(`Could not create folder ${snippetPath}`);
+        }
+        return path.join(snippetPath, fileName + ".html");
+    }
+
+    private async createLocalWebFilePath(fileName: string, webFile?: WebFile): Promise<string> {
+        // should we create folders?
+        if (this.configurationManager.useFoldersForWebFiles && webFile) {
+            const webFilePath = path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES, webFile.filePath);
+
+            try {
+                await createFolder(webFilePath);
+            } catch (error) {
+                console.error(`Could not create folder ${webFilePath}`);
+                throw Error(`Could not create folder ${webFilePath}`);
+            }
+
+            return path.join(webFilePath, fileName);
+        }
+
+        return path.join(this.workspaceFolder.uri.fsPath, FOLDER_WEB_FILES, fileName);
     }
 
     public async download(silent: boolean, incrementalRefresh: boolean): Promise<PortalData> {
@@ -421,44 +423,15 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
     public async deleteDocumentInRepository(fileType: PortalFileType, uri: Uri): Promise<void> {
         switch (fileType) {
             case PortalFileType.webTemplate:
-                const t = this.portalData?.getWebTemplate(uri);
-                if (!t) {
-                    throw Error("Could not find file in portal data with path " + uri.fsPath);
-                }
-                await this.d365WebApi.deleteWebTemplate(t.id);
-                this.portalData?.data.webTemplate.delete(t.name);
+                await this.deleteWebTemplateDocument(uri);
                 break;
 
             case PortalFileType.contentSnippet:
-                const s = this.portalData?.getContentSnippet(uri);
-                const fileId = getFileIdFromUri(uri, PortalFileType.contentSnippet);
-                if (!s) {
-                    throw Error("Could not find file in portal data with path " + uri.fsPath);
-                }
-                await this.d365WebApi.deleteContentSnippet(s.id);
-                this.portalData?.data.contentSnippet.delete(fileId);
+                await this.deleteContentSnippetDocument(uri);
                 break;
 
             case PortalFileType.webFile:
-                const f = this.portalData?.getWebFile(uri);
-                if (!f) {
-                    throw Error("Could not find file in portal data with path " + uri.fsPath);
-                }
-
-                if (!f.d365File.adx_webfileid) {
-                    throw Error("Could not delete file because adx_webfileid was not defined.");
-                }
-
-                if (!f.d365Note.annotationid) {
-                    throw Error("Could not delete file because annotationid was not defined.");
-                }
-
-                try {
-                    await this.d365WebApi.deleteWebFile(f.d365File.adx_webfileid, f.d365Note.annotationid);
-                } catch (error) {
-                    console.error("Could not delete file " + f.d365Note.filename + " Error: " + error);
-                }
-                this.portalData?.data.webFile.delete(f.fileId);
+                await this.deleteWebFileDocument(uri);
                 break;
 
             default:
@@ -466,52 +439,106 @@ export class PowerAppsPortalRepository implements QuickDiffProvider {
         }
     }
 
-    public async updateDocumentInRepository(fileType: PortalFileType, uri: Uri, updatedFileContent: string): Promise<void> {
-        if (!this.portalData) {
-            throw Error("Could not update file because portal data in repo class was not set.");
+    private async deleteWebTemplateDocument(uri: Uri): Promise<void> {
+        const t = this.portalData?.getWebTemplate(uri);
+        if (!t) {
+            throw Error("Could not find file in portal data with path " + uri.fsPath);
+        }
+        await this.d365WebApi.deleteWebTemplate(t.id);
+        this.portalData?.data.webTemplate.delete(t.name);
+    }
+
+    private async deleteContentSnippetDocument(uri: Uri): Promise<void> {
+        const s = this.portalData?.getContentSnippet(uri);
+        const fileId = getFileIdFromUri(uri, PortalFileType.contentSnippet);
+        if (!s) {
+            throw Error("Could not find file in portal data with path " + uri.fsPath);
+        }
+        await this.d365WebApi.deleteContentSnippet(s.id);
+        this.portalData?.data.contentSnippet.delete(fileId);
+    }
+
+    private async deleteWebFileDocument(uri: Uri): Promise<void> {
+        const f = this.portalData?.getWebFile(uri);
+        if (!f) {
+            throw Error("Could not find file in portal data with path " + uri.fsPath);
         }
 
+        if (!f.d365File.adx_webfileid) {
+            throw Error("Could not delete file because adx_webfileid was not defined.");
+        }
+
+        if (!f.d365Note.annotationid) {
+            throw Error("Could not delete file because annotationid was not defined.");
+        }
+
+        try {
+            await this.d365WebApi.deleteWebFile(f.d365File.adx_webfileid, f.d365Note.annotationid);
+        } catch (error) {
+            console.error("Could not delete file " + f.d365Note.filename + " Error: " + error);
+        }
+        this.portalData?.data.webFile.delete(f.fileId);
+    }
+
+    public async updateDocumentInRepository(fileType: PortalFileType, uri: Uri, updatedFileContent: string): Promise<void> {
         switch (fileType) {
             case PortalFileType.webTemplate:
-                const existingTemplate = this.portalData.getWebTemplate(uri);
-                const resultT = await this.updateWebTemplate(existingTemplate, updatedFileContent);
-                if (resultT) {
-                    this.portalData.data.webTemplate.set(resultT.name, resultT);
-                    console.log(`\t[REPO] Template ${resultT.name} was updated.`);
-                } else {
-                    throw new Error(`Could not find file for uri ${uri}`);
-                }
-
+                await this.updateWebTemplateDocument(uri, updatedFileContent);
                 break;
 
             case PortalFileType.contentSnippet:
-                const existingSnippet = this.portalData.getContentSnippet(uri);
-                const resultS = await this.updateContentSnippet(existingSnippet, updatedFileContent);
-
-                if (resultS) {
-                    this.portalData.data.contentSnippet.set(resultS.name, resultS);
-                    console.log(`\t[REPO] Snippet ${resultS.name} was updated.`);
-                } else {
-                    throw new Error(`Could not find file for uri ${uri}`);
-                }
-
+                await this.updateContentSnippetDocument(uri, updatedFileContent);
                 break;
 
             case PortalFileType.webFile:
-                const existingFile = this.portalData.getWebFile(uri);
-                const resultF = await this.updateWebFile(existingFile, updatedFileContent);
-
-                if (resultF) {
-                    this.portalData.data.webFile.set(resultF.fileId, resultF);
-                    console.log(`\t[REPO] File ${resultF.d365Note.filename} was updated.`);
-                } else {
-                    throw new Error(`Could not find file for uri ${uri}`);
-                }
-
+                await this.updateWebFileDocument(uri, updatedFileContent);
                 break;
-
             default:
                 break;
+        }
+    }
+
+    private async updateWebTemplateDocument(uri: Uri, updatedContent: string): Promise<void> {
+        if (!this.portalData) {
+            throw Error("Could not update file because portal data in repo class was not set.");
+        }
+        const existingTemplate = this.portalData.getWebTemplate(uri);
+        const resultT = await this.updateWebTemplate(existingTemplate, updatedContent);
+        if (resultT) {
+            this.portalData.data.webTemplate.set(resultT.name, resultT);
+            console.log(`\t[REPO] Template ${resultT.name} was updated.`);
+        } else {
+            throw new Error(`Could not find file for uri ${uri}`);
+        }
+    }
+
+    private async updateContentSnippetDocument(uri: Uri, updatedContent: string): Promise<void> {
+        if (!this.portalData) {
+            throw Error("Could not update file because portal data in repo class was not set.");
+        }
+        const existingSnippet = this.portalData.getContentSnippet(uri);
+        const resultS = await this.updateContentSnippet(existingSnippet, updatedContent);
+
+        if (resultS) {
+            this.portalData.data.contentSnippet.set(resultS.name, resultS);
+            console.log(`\t[REPO] Snippet ${resultS.name} was updated.`);
+        } else {
+            throw new Error(`Could not find file for uri ${uri}`);
+        }
+    }
+
+    private async updateWebFileDocument(uri: Uri, updatedContent: string): Promise<void> {
+        if (!this.portalData) {
+            throw Error("Could not update file because portal data in repo class was not set.");
+        }
+        const existingFile = this.portalData.getWebFile(uri);
+        const resultF = await this.updateWebFile(existingFile, updatedContent);
+
+        if (resultF) {
+            this.portalData.data.webFile.set(resultF.fileId, resultF);
+            console.log(`\t[REPO] File ${resultF.d365Note.filename} was updated.`);
+        } else {
+            throw new Error(`Could not find file for uri ${uri}`);
         }
     }
 
