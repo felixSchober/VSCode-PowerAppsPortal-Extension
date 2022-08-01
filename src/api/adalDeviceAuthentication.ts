@@ -148,7 +148,7 @@ export class XrmAdalDeviceCredentialsAuthentication implements IXrmAuthenticatio
     }
 
     private tryGetAccessToken(): Promise<string | undefined> {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             // check access token first
             const token = this.accessToken;
             if (token && this.accessTokenExpiry && new Date() < this.accessTokenExpiry) {

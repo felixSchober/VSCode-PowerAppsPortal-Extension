@@ -537,7 +537,6 @@ export class DynamicsApi {
 		parentPageId: string,
 		publishingStateId: string
 	): Promise<ID365WebFile> {
-		const select = ['adx_webfileid', 'adx_name', 'adx_partialurl', '_adx_websiteid_value'];
 		const file: any = {
 			adx_name: name,
 			adx_partialurl: name,
@@ -560,7 +559,6 @@ export class DynamicsApi {
 	}
 
 	private async createNote(note: ID365Note, webfileId: string): Promise<ID365Note> {
-		const select = NOTE_SELECT;
 		const noteToCreate: any = {
 			filename: note.filename,
 			isdocument: note.isdocument,

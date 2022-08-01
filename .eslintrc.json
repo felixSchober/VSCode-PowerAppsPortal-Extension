@@ -1,32 +1,27 @@
 {
-    "extends": [
-        "prettier"
-    ],
-	"ignorePatterns": [
-		"out",
-		"dist",
-		"**/*.d.ts"
-	],
-	"root": true,
+    "extends": ["eslint:recommended", "prettier"],
+    "ignorePatterns": ["out", "dist", "**/*.d.ts"],
+    "env": {
+        "browser": true,
+        "node": true,
+        "es6": true
+    },
+    "root": true,
     "parser": "@typescript-eslint/parser",
     "parserOptions": {
         "ecmaVersion": 6,
         "sourceType": "module",
         "project": "./tsconfig.eslint.json"
     },
-    "plugins": [
-        "@typescript-eslint",
-        "import",
-        "jsdoc"
-    ],
+    "plugins": ["@typescript-eslint", "import", "jsdoc"],
     "rules": {
         "@typescript-eslint/naming-convention": "error",
         "@typescript-eslint/semi": "error",
-		"@typescript-eslint/require-await": "error",
+        "@typescript-eslint/require-await": "error",
         "@typescript-eslint/no-floating-promises": "error",
         "@typescript-eslint/no-misused-promises": "error",
-		"@typescript-eslint/switch-exhaustiveness-check": "error",
-		"import/order": [
+        "@typescript-eslint/switch-exhaustiveness-check": "error",
+        "import/order": [
             "error",
             {
                 "alphabetize": {
@@ -41,13 +36,23 @@
         "curly": "error",
         "eqeqeq": "error",
         "no-throw-literal": "error",
-		"jsdoc/check-access": "error",
+        "jsdoc/check-access": "error",
         "jsdoc/check-alignment": "error",
         "jsdoc/check-indentation": "error",
         "jsdoc/check-param-names": "error",
         "jsdoc/check-values": "error",
         "jsdoc/check-tag-names": "error",
         "jsdoc/check-types": "error",
-		"jsdoc/require-description": "error"
-    }
+        "jsdoc/require-description": "error"
+    },
+    "overrides": [
+        {
+			// TS handles undefined variables already. So we don't need to check for them.
+            "files": ["*.ts"],
+            "rules": {
+                "no-undef": "off"
+            }
+        }
+    ]
 }
+

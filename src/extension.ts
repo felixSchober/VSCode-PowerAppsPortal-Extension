@@ -35,6 +35,7 @@ function register(configurationManager: ConfigurationManager, workspaceFolder: v
     const configureExtensionCommand = vscode.commands.registerCommand("powerapps-portal-local-development.configureExtension", async () => {
         console.log("[START] Configure command executed.");
         if (!workspaceFolder) {
+            console.log("[START] Workspace folder not configured. Getting folder");
             workspaceFolder = await getWorkspaceFolder();
         }
         await configureExtension(configurationManager, workspaceFolder, context, true);
@@ -95,7 +96,7 @@ async function commandRefresh(sourceControlPane: vscode.SourceControl) {
     if (sourceControl) {
         await sourceControl.refresh(false);
     } else {
-        await DialogReporter.reportError("", "Could not get source control window. Please check if the extension is configured correctly.");
+        void DialogReporter.reportError("", "Could not get source control window. Please check if the extension is configured correctly.");
     }
 }
 
@@ -136,7 +137,7 @@ async function commandCommit(sourceControlPane: vscode.SourceControl) {
     if (sourceControl) {
         await sourceControl.commitAll();
     } else {
-        await DialogReporter.reportError(
+        void DialogReporter.reportError(
             "",
             "Something really strange has happened - The source control pane went missing. Can you try to restart VsCode?"
         );
@@ -188,9 +189,9 @@ async function initializeFolderFromConfiguration(
     console.log("[START] Try initializing folder from configuration");
 
     try {
-        await configurationManager.load(context, false);
+        await configurationManager.load(false);
     } catch (error) {
-        await DialogReporter.reportError(
+        void DialogReporter.reportError(
             error,
             "Could not load configuration. Please try running the command >Power Pages: Configure again."
         );
@@ -204,9 +205,10 @@ async function initializeFolderFromConfiguration(
     );
     if (!configurationManager.isConfigured || !configurationManager.isPortalDataConfigured) {
         console.log("[START] Could not load config. Manual config required.");
-        await DialogReporter.reportError(
+        void DialogReporter.reportError(
             "",
-            "Could not load configuration. Please try to restart VSCode and run the command >Power Pages: Configure again."
+            "Could not load configuration from .portal file. Please try to restart VSCode and run the command >Power Pages: Configure again.",
+            false
         );
         return;
     }
@@ -215,7 +217,7 @@ async function initializeFolderFromConfiguration(
     try {
         portalScm = await PowerAppsPortalSourceControl.getPortalScm(context, workspaceFolder, configurationManager, false);
     } catch (error) {
-        await DialogReporter.reportError(error);
+        void DialogReporter.reportError(error);
         return;
     }
     registerPowerAppsPortalSourceControl(portalScm, context);
@@ -257,16 +259,17 @@ async function configureExtension(
     context: vscode.ExtensionContext,
     triggedFromConfigureCommand: boolean
 ) {
+    console.log(`[START] Configure extension ${triggedFromConfigureCommand ? "triggered by command" : "manually"}`);
     try {
-        await configurationManager.load(context, triggedFromConfigureCommand);
+        await configurationManager.load(triggedFromConfigureCommand);
     } catch (error) {
-        await DialogReporter.reportError(error, "Could not load configuration. Please try again.");
+        void DialogReporter.reportError(error, "Could not load configuration. Please try again.");
     }
 
     if (configurationManager.isConfigured) {
         console.log("[START] Configuration successfully loaded.");
     } else {
-        await DialogReporter.reportError("", "Could not load configuration. Please try again.");
+        void DialogReporter.reportError("", "Could not load configuration. Please try again.");
     }
 
     // only overwrite data if new instance which hasn't been configured before
@@ -277,7 +280,7 @@ async function configureExtension(
     try {
         portalScm = await PowerAppsPortalSourceControl.getPortalScm(context, workspaceFolder, configurationManager, overwriteData);
     } catch (error) {
-        await DialogReporter.reportError(error);
+        void DialogReporter.reportError(error);
         return;
     }
 
@@ -297,13 +300,6 @@ async function getWorkspaceFolder(): Promise<vscode.WorkspaceFolder> {
 }
 
 async function chooseWorkspaceFolder() {
-    const openNewWindowOptions = ["Open in current window", "Open new window"];
-    const openNewFolder = await vscode.window.showQuickPick(openNewWindowOptions, {
-        placeHolder: "Open folder in current window or a new window?",
-        ignoreFocusOut: true,
-    });
-    const useSameWindow = openNewFolder === openNewWindowOptions[0];
-
     const folders = await vscode.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
