@@ -1,6 +1,6 @@
 import path = require("path");
 
-import { ExtensionContext, window, workspace, WorkspaceFolder } from "vscode";
+import { window, workspace, WorkspaceFolder } from "vscode";
 
 import { IPortalConfigurationFile } from "../models/interfaces/portalConfigurationFile";
 import * as afs from "../scm/afs";
@@ -65,7 +65,7 @@ export class ConfigurationManager {
         return `${this.d365InstanceName}.${this.d365CrmRegion}.dynamics.com`;
     }
 
-    public async load(context: ExtensionContext, triggedFromConfigureCommand: boolean) {
+    public async load(triggedFromConfigureCommand: boolean) {
         // either the values can be loaded from a configuration file or the configuration quickInput has to be used
         try {
             await this.loadConfiguration();
@@ -113,7 +113,7 @@ export class ConfigurationManager {
             }
         }
 
-        await this.configure(context);
+        await this.configure();
     }
 
     private async loadConfiguration() {
@@ -188,7 +188,7 @@ export class ConfigurationManager {
         }
 
         await window.showInformationMessage(
-            `You can always migrate yourself by changing the \'${PORTAL_SETTING_PREFIX_ID}.${SETTINGS_FOLDER_FILES}\' setting.`
+            `You can always migrate yourself by changing the '${PORTAL_SETTING_PREFIX_ID}.${SETTINGS_FOLDER_FILES}' setting.`
         );
         return false;
     }
@@ -222,10 +222,10 @@ export class ConfigurationManager {
         }
     }
 
-    private async configure(context: ExtensionContext) {
+    private async configure() {
         let config: ConfigurationState | undefined = undefined;
         try {
-            config = await multiStepInput(context);
+            config = await multiStepInput();
         } catch (error) {
             await DialogReporter.reportError(error, "Power Pages configuration canceled.");
             if (error instanceof Error && error.message === "canceled") {

@@ -6,10 +6,10 @@ export class DialogReporter {
      * @param error Error to show
      * @param message Additional message to show before error message
      */
-    public static async reportError(error: unknown, message?: string): Promise<void> {
+    public static async reportError(error: unknown, message?: string, showDialog: boolean = true): Promise<void> {
         const errorMessage = error instanceof Error ? error.message : `${error}`;
         const additionalMessage = message !== undefined ? message + ": " : "";
-        await window.showErrorMessage(`${additionalMessage}${errorMessage}`);
+        showDialog && (await window.showErrorMessage(`${additionalMessage}${errorMessage}`));
     }
 }
 
