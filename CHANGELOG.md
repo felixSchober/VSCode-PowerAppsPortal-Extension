@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.4.1
+
+(Released 01.08.2022)
+
+**vscode engine upgrade** vscode engine was upgraded to vscode 1.69.0.
+
 ## 0.4.0
 
 (Released: 01.08.2022)
