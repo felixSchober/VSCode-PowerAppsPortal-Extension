@@ -298,6 +298,8 @@ The extension now searches for pages that both have no parent page and are also 
 
 ### Release
 
+The extension will automatically perform a release when merging to main. Before creating a merge, make sure the points in the checklist below are met.
+
 Checklist:
 
 - [ ] Check if there are any breaking changes
