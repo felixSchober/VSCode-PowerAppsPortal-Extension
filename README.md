@@ -1,12 +1,12 @@
 # PowerApps Portals Local Source Control
 
-![Build & Deploy](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/workflows/Build%20&%20Deploy/badge.svg?branch=master) [![VS Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/FelixSchober.powerapps-portal-local-development.svg)](https://marketplace.visualstudio.com/items?itemName=FelixSchober.powerapps-portal-local-development)
+![Build & Deploy](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/workflows/Build%20&%20Deploy/badge.svg?branch=main) [![VS Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/FelixSchober.powerapps-portal-local-development.svg)](https://marketplace.visualstudio.com/items?itemName=FelixSchober.powerapps-portal-local-development)
 
 This extension provides a local source control of [Power Apps portals](https://powerapps.microsoft.com/en-us/portals/) code including **web files** like images or style sheets, **web templates** and **content snippets**.
 
 Once configured, the extension loads all portal code and files to a local project folder. Then, you can edit, create or delete files. These changes can be pushed to the portal using the source control pane within visual studio code.
 
-![Change Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_intro.gif)
+![Change Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_intro.gif)
 
 >**IMPORTANT** This extension is currently in preview. There are bugs and there will be strange behavior. Please only use this in demo or dev environments and not for production (yet).
 
@@ -15,25 +15,25 @@ Once configured, the extension loads all portal code and files to a local projec
 ### Modify file
 
 You can modify web files, content snippets and web template code:
-![Change Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_intro.gif)
+![Change Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_intro.gif)
 
 ### Add new (Web) File
 
 You can add new web files, new templates and new content snippets. For new content snippets, the language is applied by following the language code from the path.
 
-![Add new Web File](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/02_feature.gif)
+![Add new Web File](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/02_feature.gif)
 
 ### Delete Files
 
 You can delete web files, templates and content snippets.
 
-![Delete Content Snippet](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/03_feature.gif)
+![Delete Content Snippet](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/03_feature.gif)
 
 ### Refresh to get latest changes
 
 You can refresh the remote changes. This will download all files. If there are changes, they will appear in the source control pane.
 
-![Refresh](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_feature.gif)
+![Refresh](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/04_feature.gif)
 
 #### Periodic fetching
 
@@ -43,7 +43,7 @@ By default, the extension will fetch incremental changes made in Dynamics every 
 
 Within the source control pane, you can click discard to discard all your local changes with the cached origin. To get the latest changes from origin, make sure to hit refresh.
 
-![Discard](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/05_feature.gif)
+![Discard](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/05_feature.gif)
 
 ## Setup
 
@@ -72,7 +72,7 @@ This extension connects to your CDS/Dynamics instance with a [Device Code](https
 
 To setup an app registration, just follow these steps:
 
-![AAD App Registration Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_3.gif)
+![AAD App Registration Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_configurationDeviceCode_3.gif)
 
 **Summary:**
 
@@ -85,11 +85,11 @@ To setup an app registration, just follow these steps:
 
 Open the command prompt in VSCode (<kbd>Ctrl</kbd> + <kbd>P</kbd> or <kbd>⌘</kbd>+ <kbd>P</kbd>) and type `>PowerApps Portals: Configure`
 
-![Extension Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_1.gif)
+![Extension Setup](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_configurationDeviceCode_1.gif)
 
 After the initial setup the extension will prompt you to copy a code and click on Ok to open the browser
 
-![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_configurationDeviceCode_2.gif)
 
 Congratulations! The setup is finished.
 
@@ -116,17 +116,17 @@ Follow the guide on the official Microsoft documentation: [Tutorial: Register an
 Lastly, you have to create the client secret which the application is going to use to obtain the token.
 Within the app registration page, go to **Certificates & secrets**
 
-![Certificates and Secrets](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_appRegistrationSecret.png)
+![Certificates and Secrets](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_appRegistrationSecret.png)
 
 Then, create a new **client secret** and specify a life time.
 
-![Create client secret](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/02_appRegistrationSecret.png)
+![Create client secret](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/02_appRegistrationSecret.png)
 
 Make sure to note down this secret because it will disappear once the page is closed.
 
 Finally, to obtain all Ids you need in the following step, go to the **Overview** page and note down the highlighted values:
 
-![Application Id and Tenant Id](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/03_appRegistrationSecret.png)
+![Application Id and Tenant Id](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/03_appRegistrationSecret.png)
 
 #### Application User - Create Application User
 
@@ -155,7 +155,7 @@ To create this user, follow the guide on the official Microsoft documentation: [
 
 To start using this application, issue the command >PowerApps Portals Configure
 
-![Configuration Steps Example](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configuration.gif)
+![Configuration Steps Example](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_configuration.gif)
 
 Alternatively, you can also configure the extension from the settings.json located in `.vscode/settings.json`.
 
@@ -228,7 +228,7 @@ Initial preview release of extension
 
 **Folder Mode for Web Files**: Web Files are now represented according to the path within the Portal. E.g. if the parent page of an image is called `assets`, the image will now be placed in `Web Files/assets/`. Creating new folder structure also creates the corresponding web page hierarchy in Dynamics.
 
-![Folder Mode for Web Files](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_release020_folderMode.png)
+![Folder Mode for Web Files](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/04_release020_folderMode.png)
 
 **Migration for Folder Mode**: There is a migration assistant that asks the user if he wants to migrate from the previous mode to the new folder mode. This assistant is triggered once the source control pane is clear (no changes) and the extension starts.
 
@@ -242,7 +242,7 @@ When the application reloads, only the most recent changes are loaded. Users can
 **Hide Commit Warning**
 The warning that committing data will override the data in Dynamics can now be overridden so that it doesn't show each time a user commits something.
 
-![Hide commit warning](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_release020_ConsentCommit.png)
+![Hide commit warning](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/04_release020_ConsentCommit.png)
 
 **Inactive Record filtering**
 Inactive records are now filtered out by default.
@@ -256,7 +256,7 @@ I fixed some of the old bugs but there will be new bugs. Sorry for that ;)
 Addition of additional user authentication method called [Device Flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code). This authentication method allows a user to make changes in the context of their own user instead of an application user.
 In addition, there is also significant less setup needed for this method.
 
-![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_configurationDeviceCode_2.gif)
 
 ### 0.3.2
 

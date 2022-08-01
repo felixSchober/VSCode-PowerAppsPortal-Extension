@@ -4,7 +4,7 @@ on:
   push:
     branches: 
       - 'feature/**' # match an pushes on feature/* and feature/<any sub branch>/*
-      - master
+      - main
     paths-ignore: # dont run when changes made to these folders 
       - '.vscode/**'
       - '.github/**'
@@ -78,11 +78,11 @@ jobs:
           path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
 
       - name: publish to marketplace
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         run: npm run deploy ${{ secrets.PAT }}
 
       - name: create a release
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token

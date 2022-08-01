@@ -44,7 +44,7 @@ When creating new web files it used to take the path prefix as the partial web f
 Addition of additional user authentication method called [Device Flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code). This authentication method allows a user to make changes in the context of their own user instead of an application user.
 In addition, there is also significant less setup needed for this method.
 
-![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/01_configurationDeviceCode_2.gif)
+![Extension Setup - Device Code](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/01_configurationDeviceCode_2.gif)
 
 ## 0.2.1
 
@@ -53,7 +53,7 @@ In addition, there is also significant less setup needed for this method.
 **Folder Mode for Web Files**:
 Web Files are now represented according to the path within the Portal. E.g. if the parent page of an image is called `assets`, the image will now be placed in `Web Files/assets/`. Creating new folder structure also creates the corresponding web page hierarchy in Dynamics.
 
-![Folder Mode for Web Files](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_release020_folderMode.png)
+![Folder Mode for Web Files](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/04_release020_folderMode.png)
 
 **Migration for Folder Mode**:
 There is a migration assistant that asks the user if he wants to migrate from the previous mode to the new folder mode. This assistant is triggered once the source control pane is clear (no changes) and the extension starts.
@@ -69,7 +69,7 @@ When the application reloads, only the most recent changes are loaded. Users can
 **Hide Commit Warning:**:
 The warning that committing data will override the data in Dynamics can now be overridden so that it doesn't show each time a user commits something.
 
-![Hide commit warning](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/master/readme/04_release020_ConsentCommit.png)
+![Hide commit warning](https://github.com/felixSchober/VSCode-PowerAppsPortal-Extension/raw/main/readme/04_release020_ConsentCommit.png)
 
 **Inactive Record filtering**:
 Inactive records are now filtered out by default.
