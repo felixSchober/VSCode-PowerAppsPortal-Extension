@@ -41,7 +41,7 @@ export class XrmAdalClientCredentialsAuthentication implements IXrmAuthenticatio
                 console.error("[AUTH] " + errorMessage);
                 void DialogReporter.reportError(
                     error,
-                    `Could not authenticate with provided credentials. To configure the extension again, issue the command '>Power Pages: Configure'.`
+                    `Could not authenticate with provided credentials. To configure the extension again, issue the command '>PowerApps Portals: Configure'.`
                 );
             }
 
