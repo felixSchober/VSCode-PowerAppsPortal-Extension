@@ -53,7 +53,7 @@ jobs:
         with:
           files: '${{github.workspace}}/package.json'
           patch-syntax: |
-            = /version => "${{ steps.gitversion.outputs.semVer }}"
+            = /version => "${{ steps.gitversion.outputs.majorMinorPatch }}"
             = /displayName => "PowerApps Portal Local Development"
             = /description => "Local source control for Power Apps portals code for web files like images or style sheets, web templates and content snippets."
       
@@ -62,7 +62,7 @@ jobs:
         with:
           files: '${{github.workspace}}/CHANGELOG.md'
         env:
-          VERSION: "${{ steps.gitversion.outputs.semVer }}"
+          VERSION: "${{ steps.gitversion.outputs.majorMinorPatch }}"
 
       - name: compile and create vsix
         run: npm run package
@@ -74,8 +74,8 @@ jobs:
       - name: upload vsix as artifact
         uses: actions/upload-artifact@v2.2.2
         with:
-          name: powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
-          path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
+          name: powerapps-portal-local-development-${{steps.gitversion.outputs.majorMinorPatch}}.vsix
+          path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.majorMinorPatch}}.vsix
 
       - name: publish to marketplace
         if: github.ref == 'refs/heads/main'
@@ -87,5 +87,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
         with:
-          tag_name: v${{ steps.gitversion.outputs.semVer }}
-          release_name: v${{ steps.gitversion.outputs.semVer }}
+          tag_name: v${{ steps.gitversion.outputs.majorMinorPatch }}
+          release_name: v${{ steps.gitversion.outputs.majorMinorPatch }}
