@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: fetch all history and tags from all branches for gitversion
         run: git fetch --prune --unshallow
