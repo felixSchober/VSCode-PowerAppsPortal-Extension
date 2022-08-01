@@ -72,7 +72,7 @@ jobs:
           echo "VSIX Path: ${{ env.vsix_path }}"
 
       - name: upload vsix as artifact
-        uses: actions/upload-artifact@v2.2.2
+        uses: actions/upload-artifact@v3.1.0
         with:
           name: powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
           path: ${{github.workspace}}/powerapps-portal-local-development-${{steps.gitversion.outputs.semVer}}.vsix
