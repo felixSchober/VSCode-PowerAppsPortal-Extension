@@ -204,14 +204,14 @@
 		"mocha": "^10.0.0",
 		"ts-loader": "^8.4.0",
 		"typescript": "^4.7.4",
-		"vsce": "^1.103.1",
+		"vsce": "^2.10.0",
 		"vscode-test": "^1.6.1",
 		"webpack": "^5.74.0",
 		"webpack-cli": "^4.10.0"
 	},
 	"dependencies": {
 		"@azure/msal-common": "^4.5.1",
-		"@azure/msal-node": "^1.11.0",
+		"@azure/msal-node": "^1.12.1",
 		"adal-node": "^0.2.3",
 		"dynamics-web-api": "^1.7.5",
 		"keytar": "^7.9.0",
